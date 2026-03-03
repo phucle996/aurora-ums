@@ -52,7 +52,7 @@ docker run --rm -it \
   -e DATABASE_URL='postgres://aurora:27012004@host.docker.internal:5432/aurora' \
   -e REDIS_ADDR='host.docker.internal:6379' \
   -e ETCD_ENDPOINTS='host.docker.internal:2379' \
-  -e TOKEN_SECRET_SYNC_ENABLED=false \
+  -e TOKEN_SECRET_SYNC_ENABLED=true \
   aurora/ums:local
 ```
 

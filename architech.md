@@ -22,7 +22,7 @@ Gin HTTP API (handlers + middleware)
    |       +--> Repositories (PostgreSQL)
    |       +--> Caches/blacklist (Redis)
    |
-   +--> Token secret sync (etcd, optional)
+   +--> Token secret sync (etcd, bắt buộc)
 ```
 
 ## 3) Các lớp chính
@@ -45,7 +45,7 @@ Gin HTTP API (handlers + middleware)
   - permission cache
   - MFA session cache
   - rate limiting state
-- etcd (optional):
+- etcd:
   - nguồn secret runtime cho `access_jwt`, `refresh_jwt`, `device_token`.
 
 ## 5) Request flow

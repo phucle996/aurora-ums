@@ -32,13 +32,16 @@ func NewApplication(cfg *config.Config) (*App, error) {
 	logger.InitLogger(&cfg.App)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	cleanup := func() {
+		cancel()
+	}
 
 	// -------------------
 	// PostgreSQL
 	// --------------------
 	db, err := psqlinfra.NewPostgres(ctx, &cfg.Psql)
 	if err != nil {
-		cancel()
+		cleanup()
 		return nil, err
 	}
 
@@ -47,7 +50,8 @@ func NewApplication(cfg *config.Config) (*App, error) {
 	// --------------------
 	redisClient, err := redisinfra.NewRedis(ctx, &cfg.Redis)
 	if err != nil {
-		cancel()
+		db.Close()
+		cleanup()
 		return nil, err
 	}
 
@@ -59,27 +63,55 @@ func NewApplication(cfg *config.Config) (*App, error) {
 	if err != nil {
 		_ = redisClient.Close()
 		db.Close()
-		cancel()
+		cleanup()
 		return nil, err
 	}
 
-	if cfg.TokenSecretSync.Enabled && modules.Etcd != nil {
-		syncer := newTokenSecretSync(modules.Etcd, modules.Token, cfg.TokenSecretSync.Prefix)
-		bootstrapTimeout := cfg.TokenSecretSync.BootstrapTimeout
-		if bootstrapTimeout <= 0 {
-			bootstrapTimeout = 5 * time.Second
+	if !cfg.TokenSecretSync.Enabled {
+		_ = redisClient.Close()
+		db.Close()
+		if modules.Etcd != nil {
+			_ = modules.Etcd.Close()
 		}
-		bootstrapCtx, bootstrapCancel := context.WithTimeout(ctx, bootstrapTimeout)
-		if err := syncer.Bootstrap(bootstrapCtx); err != nil {
-			logger.SysWarn("token.secret.sync", "bootstrap failed, fallback to local env secrets: %v", err)
-		} else {
-			logger.SysInfo("token.secret.sync", "bootstrap token secrets from etcd completed")
-		}
-		bootstrapCancel()
-
-		go syncer.Run(ctx)
-		logger.SysInfo("token.secret.sync", "watching token secrets prefix=%s", cfg.TokenSecretSync.Prefix)
+		cleanup()
+		return nil, fmt.Errorf("TOKEN_SECRET_SYNC_ENABLED must be true: token secrets are etcd-backed only")
 	}
+	if modules.Etcd == nil {
+		_ = redisClient.Close()
+		db.Close()
+		cleanup()
+		return nil, fmt.Errorf("etcd client is nil, cannot bootstrap token secrets")
+	}
+	syncer := newTokenSecretSync(modules.Etcd, modules.Token, cfg.TokenSecretSync.Prefix)
+	bootstrapTimeout := cfg.TokenSecretSync.BootstrapTimeout
+	if bootstrapTimeout <= 0 {
+		bootstrapTimeout = 5 * time.Second
+	}
+	bootstrapCtx, bootstrapCancel := context.WithTimeout(ctx, bootstrapTimeout)
+	bootstrapErr := syncer.Bootstrap(bootstrapCtx)
+	bootstrapCancel()
+	if bootstrapErr != nil {
+		_ = redisClient.Close()
+		db.Close()
+		if modules.Etcd != nil {
+			_ = modules.Etcd.Close()
+		}
+		cleanup()
+		return nil, fmt.Errorf("bootstrap token secrets from etcd failed: %w", bootstrapErr)
+	}
+	if err := modules.Token.ValidateEtcdBackedSecrets(); err != nil {
+		_ = redisClient.Close()
+		db.Close()
+		if modules.Etcd != nil {
+			_ = modules.Etcd.Close()
+		}
+		cleanup()
+		return nil, fmt.Errorf("etcd token secrets are incomplete: %w", err)
+	}
+	logger.SysInfo("token.secret.sync", "bootstrap token secrets from etcd completed")
+
+	go syncer.Run(ctx)
+	logger.SysInfo("token.secret.sync", "watching token secrets prefix=%s", cfg.TokenSecretSync.Prefix)
 
 	health := handler.NewHealthHandler(
 		db,

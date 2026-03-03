@@ -1,8 +1,8 @@
 package config
 
 import (
+	"aurora/internal/cache"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -67,16 +67,11 @@ type EtcdCfg struct {
 }
 
 type TokenCfg struct {
-	AccessSecret  string
-	AccessTTL     time.Duration
-	RefreshSecret string
-	RefreshTTL    time.Duration
-	OttSecret     string
-	OttTTL        time.Duration
-	DeviceSecret  string
-	DeviceTTL     time.Duration
-
-	mu sync.RWMutex
+	AccessTTL  time.Duration
+	RefreshTTL time.Duration
+	OttTTL     time.Duration
+	DeviceTTL  time.Duration
+	Secrets    *cache.TokenSecretCache
 }
 
 type CorsCfg struct {
@@ -169,6 +164,7 @@ func LoadConfig() *Config {
 			RefreshTTL: getEnvAsDuration("REFRESH_TOKEN_TTL", 168*time.Hour),
 			OttTTL:     getEnvAsDuration("OTT_TTL", 15*time.Minute),
 			DeviceTTL:  getEnvAsDuration("ACCESS_TOKEN_TTL", 15*time.Minute),
+			Secrets:    cache.NewTokenSecretCache(),
 		},
 		TokenSecretSync: TokenSecretSyncCfg{
 			Enabled:          getEnvAsBool("TOKEN_SECRET_SYNC_ENABLED", true),
@@ -202,55 +198,66 @@ func LoadConfig() *Config {
 }
 
 func (c *TokenCfg) GetAccessSecret() string {
-	if c == nil {
+	if c == nil || c.Secrets == nil {
 		return ""
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.AccessSecret
+	return c.Secrets.GetAccessSecret()
 }
 
 func (c *TokenCfg) SetAccessSecret(v string) {
 	if c == nil {
 		return
 	}
-	c.mu.Lock()
-	c.AccessSecret = v
-	c.mu.Unlock()
+	if c.Secrets == nil {
+		c.Secrets = cache.NewTokenSecretCache()
+	}
+	c.Secrets.SetAccessSecret(v)
 }
 
 func (c *TokenCfg) GetRefreshSecret() string {
-	if c == nil {
+	if c == nil || c.Secrets == nil {
 		return ""
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.RefreshSecret
+	return c.Secrets.GetRefreshSecret()
 }
 
 func (c *TokenCfg) SetRefreshSecret(v string) {
 	if c == nil {
 		return
 	}
-	c.mu.Lock()
-	c.RefreshSecret = v
-	c.mu.Unlock()
+	if c.Secrets == nil {
+		c.Secrets = cache.NewTokenSecretCache()
+	}
+	c.Secrets.SetRefreshSecret(v)
 }
 
 func (c *TokenCfg) GetDeviceSecret() string {
-	if c == nil {
+	if c == nil || c.Secrets == nil {
 		return ""
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.DeviceSecret
+	return c.Secrets.GetDeviceSecret()
 }
 
 func (c *TokenCfg) SetDeviceSecret(v string) {
 	if c == nil {
 		return
 	}
-	c.mu.Lock()
-	c.DeviceSecret = v
-	c.mu.Unlock()
+	if c.Secrets == nil {
+		c.Secrets = cache.NewTokenSecretCache()
+	}
+	c.Secrets.SetDeviceSecret(v)
+}
+
+func (c *TokenCfg) GetOttSecret() string {
+	if c == nil || c.Secrets == nil {
+		return ""
+	}
+	return c.Secrets.GetOttSecret()
+}
+
+func (c *TokenCfg) ValidateEtcdBackedSecrets() error {
+	if c == nil || c.Secrets == nil {
+		return cache.ErrTokenSecretCacheNil
+	}
+	return c.Secrets.Validate()
 }

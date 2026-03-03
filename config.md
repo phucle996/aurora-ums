@@ -53,16 +53,18 @@ Service đọc config từ `.env` (nếu có), sau đó đọc từ environment 
 
 ## 5) Tokens
 
-- `ACCESS_TOKEN_SECRET`
 - `ACCESS_TOKEN_TTL` (default: `15m`)
-- `REFRESH_TOKEN_SECRET`
 - `REFRESH_TOKEN_TTL` (default: `168h`)
-- `OTT_SECRET`
 - `OTT_TTL` (default: `15m`)
 
 Lưu ý:
 
-- `DEVICE_TOKEN` hiện dùng secret đồng bộ từ etcd (`device_token`) nếu `TOKEN_SECRET_SYNC_ENABLED=true`.
+- Secret không đọc từ env.
+- Secret được bootstrap + watch từ etcd theo prefix `TOKEN_SECRET_SYNC_PREFIX`:
+  - `access_jwt`
+  - `refresh_jwt`
+  - `device_token`
+- `OTT` secret được derive trong runtime từ `access_jwt` đã sync, không cần `OTT_SECRET`.
 
 ## 6) Token Secret Sync (etcd -> runtime)
 
@@ -70,11 +72,10 @@ Lưu ý:
 - `TOKEN_SECRET_SYNC_PREFIX` (default: `/admin/token-secret`)
 - `TOKEN_SECRET_SYNC_BOOTSTRAP_TIMEOUT` (default: `5s`)
 
-Nếu chạy local chưa có key trong etcd, nên tắt:
+Lưu ý:
 
-```bash
-TOKEN_SECRET_SYNC_ENABLED=false
-```
+- UMS yêu cầu `TOKEN_SECRET_SYNC_ENABLED=true`.
+- Nếu bootstrap secret từ etcd lỗi thì service sẽ fail startup.
 
 ## 7) CORS
 
@@ -103,13 +104,10 @@ REDIS_DB=0
 REDIS_TLS=false
 
 ETCD_ENDPOINTS=localhost:2379
-TOKEN_SECRET_SYNC_ENABLED=false
+TOKEN_SECRET_SYNC_ENABLED=true
 
-ACCESS_TOKEN_SECRET=change-me-access
 ACCESS_TOKEN_TTL=15m
-REFRESH_TOKEN_SECRET=change-me-refresh
 REFRESH_TOKEN_TTL=240h
-OTT_SECRET=change-me-ott
 OTT_TTL=15m
 
 CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173

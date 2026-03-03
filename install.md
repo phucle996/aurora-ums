@@ -31,7 +31,7 @@ APP_PORT=3005
 DATABASE_URL=postgres://aurora:27012004@localhost:5432/aurora
 REDIS_ADDR=localhost:6379
 ETCD_ENDPOINTS=localhost:2379
-TOKEN_SECRET_SYNC_ENABLED=false
+TOKEN_SECRET_SYNC_ENABLED=true
 ```
 
 Chi tiết full biến môi trường xem `config.md`.
@@ -96,5 +96,5 @@ Thêm vào `/etc/hosts`:
 
 - Readiness fail postgres: kiểm tra `DATABASE_URL`, DB đã chạy chưa.
 - Readiness fail redis: kiểm tra `REDIS_ADDR` và auth/TLS.
-- Service fail lúc boot với etcd: set `TOKEN_SECRET_SYNC_ENABLED=false` hoặc đảm bảo etcd có secret key đúng prefix.
+- Service fail lúc boot với etcd: kiểm tra etcd đang chạy và đã có token secret do admin service bootstrap/rotate ở đúng prefix.
 - CORS lỗi ở browser: chỉnh `CORS_ALLOW_ORIGINS` theo đúng domain frontend.

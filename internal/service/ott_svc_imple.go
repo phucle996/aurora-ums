@@ -33,7 +33,7 @@ func (s *OttSvcImple) CreateToken(ctx context.Context, userID uuid.UUID, tokenTy
 		return "", err
 	}
 	// hash token
-	hashToken, err := security.HashToken(plainToken, s.Token.OttSecret)
+	hashToken, err := security.HashToken(plainToken, s.Token.GetOttSecret())
 	if err != nil {
 		return "", err
 	}
@@ -55,7 +55,7 @@ func (s *OttSvcImple) CreateToken(ctx context.Context, userID uuid.UUID, tokenTy
 }
 
 func (s *OttSvcImple) ValidateToken(ctx context.Context, userID uuid.UUID, plainToken string, tokenType entity.OttType) error {
-	tokenHash, err := security.HashToken(plainToken, s.Token.OttSecret)
+	tokenHash, err := security.HashToken(plainToken, s.Token.GetOttSecret())
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (s *OttSvcImple) ValidateToken(ctx context.Context, userID uuid.UUID, plain
 }
 
 func (s *OttSvcImple) ConsumTokenTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, plainToken string, tokenType entity.OttType) error {
-	tokenHash, err := security.HashToken(plainToken, s.Token.OttSecret)
+	tokenHash, err := security.HashToken(plainToken, s.Token.GetOttSecret())
 	if err != nil {
 		return err
 	}
