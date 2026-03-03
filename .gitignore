@@ -1,0 +1,26 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build outputs
+bin/
+dist/
+tmp/
+*.out
+*.test
+coverage.out
+
+# Logs
+logs/
+*.log
+
+# Editor/IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# OS / tooling
+.DS_Store
+.codex/
+
