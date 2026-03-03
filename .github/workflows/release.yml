@@ -31,12 +31,6 @@ jobs:
       - name: Run tests
         run: go test ./...
 
-      # (Optional) quick debug when Trivy fails due to GitHub rate-limit
-      # - name: Debug GitHub rate limit
-      #   run: gh api rate_limit || true
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Trivy scan (source code)
         uses: aquasecurity/trivy-action@0.34.2
         env:
@@ -44,7 +38,6 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
-          version: v0.65.0
           skip-files: .github/workflows/release.yml,**/*.md
           format: table
           exit-code: "1"
