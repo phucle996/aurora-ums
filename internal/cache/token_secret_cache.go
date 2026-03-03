@@ -13,10 +13,10 @@ var ErrTokenSecretCacheNil = errors.New("token secret cache is nil")
 
 // TokenSecretCache keeps etcd-synced token secrets in-memory.
 type TokenSecretCache struct {
-	accessSecret  string
-	refreshSecret string
-	deviceSecret  string
-	ottSecret     string
+	AccessSecret  string
+	RefreshSecret string
+	DeviceSecret  string
+	OttSecret     string
 
 	mu sync.RWMutex
 }
@@ -32,9 +32,9 @@ func (c *TokenSecretCache) SetAccessSecret(v string) {
 	trimmed := strings.TrimSpace(v)
 
 	c.mu.Lock()
-	c.accessSecret = trimmed
+	c.AccessSecret = trimmed
 	// Keep OTT secret derived from access secret so UMS does not use env for OTT.
-	c.ottSecret = deriveOTTSecret(trimmed)
+	c.OttSecret = deriveOTTSecret(trimmed)
 	c.mu.Unlock()
 }
 
@@ -45,7 +45,7 @@ func (c *TokenSecretCache) SetRefreshSecret(v string) {
 	trimmed := strings.TrimSpace(v)
 
 	c.mu.Lock()
-	c.refreshSecret = trimmed
+	c.RefreshSecret = trimmed
 	c.mu.Unlock()
 }
 
@@ -56,7 +56,7 @@ func (c *TokenSecretCache) SetDeviceSecret(v string) {
 	trimmed := strings.TrimSpace(v)
 
 	c.mu.Lock()
-	c.deviceSecret = trimmed
+	c.DeviceSecret = trimmed
 	c.mu.Unlock()
 }
 
@@ -66,7 +66,7 @@ func (c *TokenSecretCache) GetAccessSecret() string {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.accessSecret
+	return c.AccessSecret
 }
 
 func (c *TokenSecretCache) GetRefreshSecret() string {
@@ -75,7 +75,7 @@ func (c *TokenSecretCache) GetRefreshSecret() string {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.refreshSecret
+	return c.RefreshSecret
 }
 
 func (c *TokenSecretCache) GetDeviceSecret() string {
@@ -84,7 +84,7 @@ func (c *TokenSecretCache) GetDeviceSecret() string {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.deviceSecret
+	return c.DeviceSecret
 }
 
 func (c *TokenSecretCache) GetOttSecret() string {
@@ -93,7 +93,7 @@ func (c *TokenSecretCache) GetOttSecret() string {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.ottSecret
+	return c.OttSecret
 }
 
 func (c *TokenSecretCache) Validate() error {
@@ -103,16 +103,16 @@ func (c *TokenSecretCache) Validate() error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if strings.TrimSpace(c.accessSecret) == "" {
+	if strings.TrimSpace(c.AccessSecret) == "" {
 		return fmt.Errorf("missing access token secret from etcd")
 	}
-	if strings.TrimSpace(c.refreshSecret) == "" {
+	if strings.TrimSpace(c.RefreshSecret) == "" {
 		return fmt.Errorf("missing refresh token secret from etcd")
 	}
-	if strings.TrimSpace(c.deviceSecret) == "" {
+	if strings.TrimSpace(c.DeviceSecret) == "" {
 		return fmt.Errorf("missing device token secret from etcd")
 	}
-	if strings.TrimSpace(c.ottSecret) == "" {
+	if strings.TrimSpace(c.OttSecret) == "" {
 		return fmt.Errorf("missing derived ott token secret")
 	}
 	return nil

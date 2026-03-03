@@ -107,7 +107,7 @@ func LoadConfig() *Config {
 
 	return &Config{
 		App: AppCfg{
-			Name:     getEnv("APP_NAME", "Aurora Cloud"),
+			Name:     "Aurora Cloud",
 			Host:     getEnv("APP_HOST", ""),
 			Port:     getEnvAsInt("APP_PORT", 3005),
 			LogLV:    getEnv("APP_LOG_LEVEL", ""),
@@ -160,10 +160,10 @@ func LoadConfig() *Config {
 			SASLPassword:  getEnv("ETCD_SASL_PASSWORD", ""),
 		},
 		Token: TokenCfg{
-			AccessTTL:  getEnvAsDuration("ACCESS_TOKEN_TTL", 15*time.Minute),
-			RefreshTTL: getEnvAsDuration("REFRESH_TOKEN_TTL", 168*time.Hour),
-			OttTTL:     getEnvAsDuration("OTT_TTL", 15*time.Minute),
-			DeviceTTL:  getEnvAsDuration("ACCESS_TOKEN_TTL", 15*time.Minute),
+			AccessTTL:  15 * time.Minute,
+			RefreshTTL: 168 * time.Hour,
+			OttTTL:     15 * time.Minute,
+			DeviceTTL:  15 * time.Minute,
 			Secrets:    cache.NewTokenSecretCache(),
 		},
 		TokenSecretSync: TokenSecretSyncCfg{
