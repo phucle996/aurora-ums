@@ -1,0 +1,18 @@
+FROM golang:1.25-alpine AS base
+
+WORKDIR /app
+
+# Install build tools and air for live reload
+RUN apk add --no-cache git build-base && \
+    go install github.com/air-verse/air@latest
+
+# Pre-download dependencies (optional, speeds up first run)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy project
+COPY . .
+
+EXPOSE 3000
+
+CMD ["air", "-c", ".air.toml"]

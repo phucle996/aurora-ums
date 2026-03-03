@@ -1,0 +1,18 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "tmp/bin/server"
+  cmd = "go build -o tmp/bin/server ./cmd/server"
+  include_ext = ["go", "mod", "sum"]
+  exclude_dir = ["tmp", "vendor"]
+  delay = 1000
+
+[log]
+  time = true
+
+[serve]
+  cmd = "tmp/bin/server"
+  restart_delay = 500
+  grace = 1000
+  kill_delay = 500
