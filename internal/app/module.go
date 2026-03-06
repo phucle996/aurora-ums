@@ -1,7 +1,6 @@
 package app
 
 import (
-	etcdinfra "aurora/infra/etcd"
 	redisinfra "aurora/infra/redis"
 	"aurora/internal/app/txmanager"
 	"aurora/internal/cache"
@@ -16,14 +15,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
-	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type Modules struct {
 	// Infrastructure
 	PostgresDB *pgxpool.Pool
 	Redis      *redis.Client
-	Etcd       *clientv3.Client
 
 	AuthHandler  *handler.AuthHandler
 	UserHandler  *handler.UserHandler
@@ -50,11 +47,7 @@ func NewModules(
 	publisher redisinfra.EventPublisher,
 	cfg *config.Config,
 ) (*Modules, error) {
-	etcdClient, err := etcdinfra.NewClient(&cfg.Etcd)
-	if err != nil {
-		return nil, err
-	}
-
+	_ = ctx
 	txMgr := txmanager.NewPgxTxManager(db)
 	rlBucket := ratelimit.NewBucket(redis)
 	jwtBlacklist := cache.NewJWTBlacklist(redis)
@@ -63,7 +56,7 @@ func NewModules(
 	mfaSession := cache.NewMFASessionCache(redis)
 
 	userRepo := repoImple.NewUserRepoImple(db)
-	ottrepo := repoImple.NewOttRepoImple(db)
+	ottrepo := repoImple.NewOttRepoImple(redis)
 	refreshRepo := repoImple.NewRefreshRepoImple(db)
 	deviceRepo := repoImple.NewDeviceRepoImple(db)
 	mfaRepo := repoImple.NewMFARepoImple(db)
@@ -89,7 +82,6 @@ func NewModules(
 		RbacHandler:  rbacHandler,
 		PostgresDB:   db,
 		Redis:        redis,
-		Etcd:         etcdClient,
 		RateLimiter:  rlBucket,
 		Publisher:    publisher,
 		Token:        &cfg.Token,

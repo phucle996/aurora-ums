@@ -11,7 +11,7 @@ import (
 
 var ErrTokenSecretCacheNil = errors.New("token secret cache is nil")
 
-// TokenSecretCache keeps etcd-synced token secrets in-memory.
+// TokenSecretCache keeps runtime token secrets in-memory.
 type TokenSecretCache struct {
 	AccessSecret  string
 	RefreshSecret string
@@ -104,13 +104,13 @@ func (c *TokenSecretCache) Validate() error {
 	defer c.mu.RUnlock()
 
 	if strings.TrimSpace(c.AccessSecret) == "" {
-		return fmt.Errorf("missing access token secret from etcd")
+		return fmt.Errorf("missing access token secret")
 	}
 	if strings.TrimSpace(c.RefreshSecret) == "" {
-		return fmt.Errorf("missing refresh token secret from etcd")
+		return fmt.Errorf("missing refresh token secret")
 	}
 	if strings.TrimSpace(c.DeviceSecret) == "" {
-		return fmt.Errorf("missing device token secret from etcd")
+		return fmt.Errorf("missing device token secret")
 	}
 	if strings.TrimSpace(c.OttSecret) == "" {
 		return fmt.Errorf("missing derived ott token secret")

@@ -4,133 +4,132 @@ import (
 	"aurora/internal/domain/entity"
 	domainrepo "aurora/internal/domain/repository"
 	"aurora/internal/errorx"
-	"aurora/internal/model"
 	"context"
+	"crypto/subtle"
 	"errors"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type OttRepoImple struct {
-	db *pgxpool.Pool
+	redis         *redis.Client
+	purposePrefix string
 }
 
-func NewOttRepoImple(db *pgxpool.Pool) domainrepo.OttRepoInterface {
-	return &OttRepoImple{
-		db: db,
-	}
+var consumeOTTScript = redis.NewScript(`
+local key = KEYS[1]
+local expected = ARGV[1]
+local current = redis.call("GET", key)
+if not current then
+  return 0
+end
+if current == expected then
+  redis.call("DEL", key)
+  return 1
+end
+return -1
+`)
 
+func NewOttRepoImple(redisClient *redis.Client) domainrepo.OttRepoInterface {
+	return &OttRepoImple{
+		redis:         redisClient,
+		purposePrefix: "ott:user-purpose:",
+	}
 }
 
 func (r *OttRepoImple) Create(ctx context.Context, ott *entity.OneTimeToken) error {
-	if ott == nil {
-		return errorx.ErrEntityNil
-	}
-
-	m := model.OttEntityToModel(*ott)
-
-	const q = `
-	INSERT INTO one_time_tokens (
-		id,
-		user_id,
-		token_hash,
-		purpose,
-		expires_at,
-		created_at
-	)
-	VALUES ($1, $2, $3, $4, $5, $6)
-	ON CONFLICT (user_id, purpose)
-	DO UPDATE SET
-		id = EXCLUDED.id,
-		token_hash = EXCLUDED.token_hash,
-		expires_at = EXCLUDED.expires_at,
-		created_at = EXCLUDED.created_at
-`
-
-	_, err := r.db.Exec(ctx, q,
-		m.ID,
-		m.UserID,
-		m.TokenHash,
-		m.Purpose,
-		m.ExpiresAt,
-		m.CreatedAt,
-	)
+	userID, purpose, tokenHash, err := validateOTTInput(ott)
 	if err != nil {
 		return err
 	}
-
-	ott.ID = m.ID
-	ott.CreatedAt = m.CreatedAt
-	return nil
-}
-
-func (r *OttRepoImple) Consum(ctx context.Context, ott *entity.OneTimeToken) error {
-	m := model.OttEntityToModel(*ott)
-
-	const q = `
-		DELETE FROM one_time_tokens
-		WHERE token_hash = $1 AND user_id = $2 AND purpose = $3
-		  AND (expires_at IS NULL OR expires_at > NOW())
-	`
-
-	cmd, err := r.db.Exec(ctx, q, m.TokenHash, m.UserID, m.Purpose)
-	if err != nil {
-		return err
+	if r == nil || r.redis == nil {
+		return errors.New("redis client is nil")
 	}
 
-	affected := cmd.RowsAffected()
-	if affected == 0 {
-		return errorx.ErrOttNotFound
+	ttl := time.Until(ott.ExpiresAt)
+	if ttl <= 0 {
+		return errorx.ErrInvalidArgument
 	}
-	if affected > 1 {
-		return errorx.ErrUnexpectedRows
-	}
-	return nil
+
+	key := r.purposeKey(userID, purpose)
+	return r.redis.Set(ctx, key, tokenHash, ttl).Err()
 }
 
 func (r *OttRepoImple) Validate(ctx context.Context, ott *entity.OneTimeToken) error {
-	m := model.OttEntityToModel(*ott)
-
-	const q = `
-		SELECT 1
-		FROM one_time_tokens
-		WHERE token_hash = $1 AND user_id = $2 AND purpose = $3
-		  AND expires_at > NOW()
-		LIMIT 1
-	`
-
-	var exists int
-	err := r.db.QueryRow(ctx, q, m.TokenHash, m.UserID, m.Purpose).Scan(&exists)
+	userID, purpose, tokenHash, err := validateOTTInput(ott)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if r == nil || r.redis == nil {
+		return errors.New("redis client is nil")
+	}
+
+	raw, err := r.redis.Get(ctx, r.purposeKey(userID, purpose)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
 			return errorx.ErrOttNotFound
 		}
 		return err
+	}
+
+	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(raw)), []byte(tokenHash)) != 1 {
+		return errorx.ErrOttNotFound
 	}
 	return nil
 }
 
 func (r *OttRepoImple) ConsumTx(ctx context.Context, tx pgx.Tx, ott *entity.OneTimeToken) error {
-	m := model.OttEntityToModel(*ott)
+	_ = tx
+	return r.consume(ctx, ott)
+}
 
-	const q = `
-		DELETE FROM one_time_tokens
-		WHERE token_hash = $1 AND user_id = $2 AND purpose = $3
-		  AND (expires_at IS NULL OR expires_at > NOW())
-	`
+func (r *OttRepoImple) consume(ctx context.Context, ott *entity.OneTimeToken) error {
+	userID, purpose, tokenHash, err := validateOTTInput(ott)
+	if err != nil {
+		return err
+	}
+	if r == nil || r.redis == nil {
+		return errors.New("redis client is nil")
+	}
 
-	cmd, err := tx.Exec(ctx, q, m.TokenHash, m.UserID, m.Purpose)
+	result, err := consumeOTTScript.Run(
+		ctx,
+		r.redis,
+		[]string{r.purposeKey(userID, purpose)},
+		tokenHash,
+	).Int()
 	if err != nil {
 		return err
 	}
 
-	affected := cmd.RowsAffected()
-	if affected == 0 {
+	switch result {
+	case 1:
+		return nil
+	case 0, -1:
+		return errorx.ErrOttNotFound
+	default:
 		return errorx.ErrOttNotFound
 	}
-	if affected > 1 {
-		return errorx.ErrUnexpectedRows
+}
+
+func (r *OttRepoImple) purposeKey(userID, purpose string) string {
+	return r.purposePrefix + strings.TrimSpace(userID) + ":" + strings.TrimSpace(purpose)
+}
+
+func validateOTTInput(ott *entity.OneTimeToken) (string, string, string, error) {
+	if ott == nil {
+		return "", "", "", errorx.ErrEntityNil
 	}
-	return nil
+
+	userID := ott.UserID.String()
+	tokenHash := strings.TrimSpace(ott.TokenHash)
+	purpose := strings.TrimSpace(string(ott.Purpose))
+	if ott.UserID == uuid.Nil || tokenHash == "" || purpose == "" {
+		return "", "", "", errorx.ErrInvalidArgument
+	}
+	return userID, purpose, tokenHash, nil
 }

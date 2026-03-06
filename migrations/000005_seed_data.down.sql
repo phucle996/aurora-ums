@@ -2,25 +2,25 @@
 -- USER ROLES
 -- =========================
 
-DELETE FROM ums.user_roles
+DELETE FROM user_roles
 WHERE role_id IN (
-  SELECT id FROM ums.roles WHERE name IN ('root', 'admin', 'user') AND scope = 'global'
+  SELECT id FROM roles WHERE name IN ('root', 'admin', 'user') AND scope = 'global'
 );
 
 -- =========================
 -- ROLE PERMISSIONS
 -- =========================
 
-DELETE FROM ums.role_permissions
+DELETE FROM role_permissions
 WHERE role_id IN (
-  SELECT id FROM ums.roles WHERE name IN ('root', 'admin', 'user') AND scope = 'global'
+  SELECT id FROM roles WHERE name IN ('root', 'admin', 'user') AND scope = 'global'
 );
 
 -- =========================
 -- PERMISSIONS
 -- =========================
 
-DELETE FROM ums.permissions
+DELETE FROM permissions
 WHERE name IN (
   'user.read',
   'user.write',
@@ -34,7 +34,7 @@ WHERE name IN (
 -- ROLES
 -- =========================
 
-DELETE FROM ums.roles
+DELETE FROM roles
 WHERE name IN ('root', 'admin', 'user')
   AND scope = 'global';
 
@@ -42,45 +42,40 @@ WHERE name IN ('root', 'admin', 'user')
 -- USERS
 -- =========================
 
-DELETE FROM ums.mfa_challenges
+DELETE FROM mfa_challenges
 WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
+  SELECT id FROM users WHERE username = 'root'
 );
 
-DELETE FROM ums.mfa_recovery_codes
+DELETE FROM mfa_recovery_codes
 WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
+  SELECT id FROM users WHERE username = 'root'
 );
 
-DELETE FROM ums.mfa_methods
+DELETE FROM mfa_methods
 WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
+  SELECT id FROM users WHERE username = 'root'
 );
 
-DELETE FROM ums.one_time_tokens
+DELETE FROM refresh_tokens
 WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
+  SELECT id FROM users WHERE username = 'root'
 );
 
-DELETE FROM ums.refresh_tokens
+DELETE FROM user_devices
 WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
+  SELECT id FROM users WHERE username = 'root'
 );
 
-DELETE FROM ums.user_devices
+DELETE FROM user_roles
 WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
+  SELECT id FROM users WHERE username = 'root'
 );
 
-DELETE FROM ums.user_roles
+DELETE FROM profiles
 WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
+  SELECT id FROM users WHERE username = 'root'
 );
 
-DELETE FROM ums.profiles
-WHERE user_id IN (
-  SELECT id FROM ums.users WHERE username = 'root'
-);
-
-DELETE FROM ums.users
+DELETE FROM users
 WHERE username = 'root';

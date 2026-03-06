@@ -47,12 +47,6 @@ Run container:
 docker run --rm -it \
   --name ums \
   -p 3005:3005 \
-  -e APP_HOST=0.0.0.0 \
-  -e APP_PORT=3005 \
-  -e DATABASE_URL='postgres://aurora:27012004@host.docker.internal:5432/aurora' \
-  -e REDIS_ADDR='host.docker.internal:6379' \
-  -e ETCD_ENDPOINTS='host.docker.internal:2379' \
-  -e TOKEN_SECRET_SYNC_ENABLED=true \
   aurora/ums:local
 ```
 

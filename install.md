@@ -1,42 +1,13 @@
 # UserManagmentSystem Installation
 
-Tài liệu này mô tả cách cài đặt và chạy UMS.
-
 ## 1) Prerequisites
 
-- Go `1.25.6`
-- Docker + Docker Compose v2
+- Go `1.26+`
 - PostgreSQL `16+`
 - Redis `7+`
-- etcd `v3` (nếu bật token secret sync)
-- Tool migrate (`golang-migrate`)
+- Admin service đang chạy gRPC/TLS
 
-Cài migrate (Linux):
-
-```bash
-curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.3/migrate.linux-amd64.tar.gz | tar xvz
-sudo mv migrate /usr/local/bin/migrate
-migrate -version
-```
-
-## 2) Chuẩn bị config
-
-Trong thư mục `UserManagmentSystem`, tạo/chỉnh `.env`.
-
-Tối thiểu cần:
-
-```env
-APP_HOST=0.0.0.0
-APP_PORT=3005
-DATABASE_URL=postgres://aurora:27012004@localhost:5432/aurora
-REDIS_ADDR=localhost:6379
-ETCD_ENDPOINTS=localhost:2379
-TOKEN_SECRET_SYNC_ENABLED=true
-```
-
-Chi tiết full biến môi trường xem `config.md`.
-
-## 3) Migrate database
+## 2) Migrate database
 
 ```bash
 cd migrations
@@ -44,57 +15,24 @@ DATABASE_URL='postgres://aurora:27012004@localhost:5432/aurora' ./scripts/migrat
 cd ..
 ```
 
-Kiểm tra version:
-
-```bash
-cd migrations
-DATABASE_URL='postgres://aurora:27012004@localhost:5432/aurora' ./scripts/migrate.sh version
-cd ..
-```
-
-## 4) Run local (không Docker)
+## 3) Run local
 
 ```bash
 go mod download
 go run ./cmd/server
 ```
 
-Hoặc hot reload:
+UMS sẽ pull runtime config từ Admin qua RPC khi startup.
 
-```bash
-air -c .air.toml
-```
+## 4) Bootstrap RPC
 
-Health checks:
+Không cần env cho bootstrap endpoint.
 
-- `GET http://localhost:3005/health/liveness`
-- `GET http://localhost:3005/health/readiness`
-- `GET http://localhost:3005/health/startup`
+UMS mặc định gọi Admin RPC tại:
 
-## 5) Run bằng root docker compose
+`admin.aurora.local:3009`
 
-Từ root project:
+## 5) Health check
 
-```bash
-docker compose up -d postgres redis etcd ums-service nginx
-```
-
-Truy cập qua nginx:
-
-- `https://ums.aurora.local/health/liveness`
-- `https://ums.aurora.local/health/readiness`
-
-## 6) Domain local (tuỳ chọn)
-
-Thêm vào `/etc/hosts`:
-
-```text
-127.0.0.1 aurora.local ums.aurora.local vm.aurora.local mail.aurora.local admin.aurora.local
-```
-
-## 7) Troubleshooting nhanh
-
-- Readiness fail postgres: kiểm tra `DATABASE_URL`, DB đã chạy chưa.
-- Readiness fail redis: kiểm tra `REDIS_ADDR` và auth/TLS.
-- Service fail lúc boot với etcd: kiểm tra etcd đang chạy và đã có token secret do admin service bootstrap/rotate ở đúng prefix.
-- CORS lỗi ở browser: chỉnh `CORS_ALLOW_ORIGINS` theo đúng domain frontend.
+- `GET https://ums.aurora.local/health/liveness`
+- `GET https://ums.aurora.local/health/readiness`

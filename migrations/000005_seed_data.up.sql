@@ -3,7 +3,7 @@
 -- =========================
 
 WITH upserted_root_user AS (
-  INSERT INTO ums.users (
+  INSERT INTO users (
     id,
     username,
     email,
@@ -35,7 +35,7 @@ WITH upserted_root_user AS (
     updated_at = now()
   RETURNING id
 )
-INSERT INTO ums.profiles (
+INSERT INTO profiles (
   id,
   user_id,
   full_name,
@@ -59,7 +59,7 @@ SET
 -- ROLES
 -- =========================
 
-INSERT INTO ums.roles (id, name, scope, tenant_id, description, created_at)
+INSERT INTO roles (id, name, scope, tenant_id, description, created_at)
 VALUES
   (gen_random_uuid(), 'root',  'global', NULL, 'System root role',  now()),
   (gen_random_uuid(), 'admin', 'global', NULL, 'System admin role', now()),
@@ -70,7 +70,7 @@ ON CONFLICT DO NOTHING;
 -- PERMISSIONS
 -- =========================
 
-INSERT INTO ums.permissions (id, name, description, created_at)
+INSERT INTO permissions (id, name, description, created_at)
 VALUES
   (gen_random_uuid(), 'user.read',         'Read users',          now()),
   (gen_random_uuid(), 'user.write',        'Create/update users', now()),
@@ -85,31 +85,31 @@ ON CONFLICT DO NOTHING;
 -- =========================
 
 -- root gets all permissions
-INSERT INTO ums.role_permissions (id, role_id, permission_id, created_at)
+INSERT INTO role_permissions (id, role_id, permission_id, created_at)
 SELECT
   gen_random_uuid(),
   r.id,
   p.id,
   now()
-FROM ums.roles r
-JOIN ums.permissions p ON TRUE
+FROM roles r
+JOIN permissions p ON TRUE
 WHERE r.name = 'root'
 ON CONFLICT DO NOTHING;
 
 -- admin gets all except permission.write
-DELETE FROM ums.role_permissions
+DELETE FROM role_permissions
 WHERE role_id IN (
-  SELECT id FROM ums.roles WHERE name = 'admin'
+  SELECT id FROM roles WHERE name = 'admin'
 );
 
-INSERT INTO ums.role_permissions (id, role_id, permission_id, created_at)
+INSERT INTO role_permissions (id, role_id, permission_id, created_at)
 SELECT
   gen_random_uuid(),
   r.id,
   p.id,
   now()
-FROM ums.roles r
-JOIN ums.permissions p ON p.name IN (
+FROM roles r
+JOIN permissions p ON p.name IN (
   'user.read',
   'user.write',
   'role.read',
@@ -120,19 +120,19 @@ WHERE r.name = 'admin'
 ON CONFLICT DO NOTHING;
 
 -- user gets read-only permissions
-DELETE FROM ums.role_permissions
+DELETE FROM role_permissions
 WHERE role_id IN (
-  SELECT id FROM ums.roles WHERE name = 'user'
+  SELECT id FROM roles WHERE name = 'user'
 );
 
-INSERT INTO ums.role_permissions (id, role_id, permission_id, created_at)
+INSERT INTO role_permissions (id, role_id, permission_id, created_at)
 SELECT
   gen_random_uuid(),
   r.id,
   p.id,
   now()
-FROM ums.roles r
-JOIN ums.permissions p ON p.name IN (
+FROM roles r
+JOIN permissions p ON p.name IN (
   'user.read',
   'role.read',
   'permission.read'
@@ -144,13 +144,13 @@ ON CONFLICT DO NOTHING;
 -- USER ROLES (ROOT USER)
 -- =========================
 
-INSERT INTO ums.user_roles (id, user_id, role_id, created_at)
+INSERT INTO user_roles (id, user_id, role_id, created_at)
 SELECT
   gen_random_uuid(),
   u.id,
   r.id,
   now()
-FROM ums.users u
-JOIN ums.roles r ON r.name = 'root' 
+FROM users u
+JOIN roles r ON r.name = 'root' 
 WHERE u.username = 'root'
 ON CONFLICT DO NOTHING;

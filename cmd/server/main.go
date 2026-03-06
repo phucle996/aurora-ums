@@ -1,8 +1,10 @@
 package main
 
 import (
+	adminrpc "aurora/infra/adminrpc"
 	"aurora/internal/app"
 	"aurora/internal/config"
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -12,6 +14,21 @@ import (
 
 func main() {
 	cfg := config.LoadConfig()
+
+	bootstrapCtx, cancelBootstrap := context.WithTimeout(context.Background(), cfg.AdminRPC.DialTimeout)
+	if cfg.AdminRPC.DialTimeout <= 0 {
+		bootstrapCtx, cancelBootstrap = context.WithTimeout(context.Background(), 5*time.Second)
+	}
+	runtimeValues, err := adminrpc.FetchUMSRuntimeValues(bootstrapCtx, &cfg.AdminRPC)
+	if err != nil {
+		cancelBootstrap()
+		log.Fatalf("failed to pull runtime config from admin rpc: %v", err)
+	}
+	if err := cfg.ApplyRuntimeValues(runtimeValues); err != nil {
+		cancelBootstrap()
+		log.Fatalf("failed to apply runtime config from admin rpc: %v", err)
+	}
+	cancelBootstrap()
 
 	loc, err := time.LoadLocation(cfg.App.TimeZone)
 	if err != nil {

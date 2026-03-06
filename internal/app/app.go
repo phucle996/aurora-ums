@@ -8,9 +8,12 @@ import (
 	"aurora/internal/transport/http/middleware"
 	"aurora/pkg/logger"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -67,51 +70,32 @@ func NewApplication(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	if !cfg.TokenSecretSync.Enabled {
-		_ = redisClient.Close()
-		db.Close()
-		if modules.Etcd != nil {
-			_ = modules.Etcd.Close()
-		}
-		cleanup()
-		return nil, fmt.Errorf("TOKEN_SECRET_SYNC_ENABLED must be true: token secrets are etcd-backed only")
-	}
-	if modules.Etcd == nil {
-		_ = redisClient.Close()
-		db.Close()
-		cleanup()
-		return nil, fmt.Errorf("etcd client is nil, cannot bootstrap token secrets")
-	}
-	syncer := newTokenSecretSync(modules.Etcd, modules.Token, cfg.TokenSecretSync.Prefix)
-	bootstrapTimeout := cfg.TokenSecretSync.BootstrapTimeout
-	if bootstrapTimeout <= 0 {
-		bootstrapTimeout = 5 * time.Second
-	}
+	syncer := newTokenSecretSync(modules.Redis, modules.Token)
+	bootstrapTimeout := tokenSecretBootstrapTimeout
 	bootstrapCtx, bootstrapCancel := context.WithTimeout(ctx, bootstrapTimeout)
 	bootstrapErr := syncer.Bootstrap(bootstrapCtx)
 	bootstrapCancel()
 	if bootstrapErr != nil {
 		_ = redisClient.Close()
 		db.Close()
-		if modules.Etcd != nil {
-			_ = modules.Etcd.Close()
-		}
 		cleanup()
-		return nil, fmt.Errorf("bootstrap token secrets from etcd failed: %w", bootstrapErr)
+		return nil, fmt.Errorf("bootstrap token secrets from redis failed: %w", bootstrapErr)
 	}
-	if err := modules.Token.ValidateEtcdBackedSecrets(); err != nil {
+	if err := modules.Token.ValidateSecrets(); err != nil {
 		_ = redisClient.Close()
 		db.Close()
-		if modules.Etcd != nil {
-			_ = modules.Etcd.Close()
-		}
 		cleanup()
-		return nil, fmt.Errorf("etcd token secrets are incomplete: %w", err)
+		return nil, fmt.Errorf("redis token secrets are incomplete: %w", err)
 	}
-	logger.SysInfo("token.secret.sync", "bootstrap token secrets from etcd completed")
+	logger.SysInfo("token.secret.sync", "bootstrap token secrets from redis completed")
 
 	go syncer.Run(ctx)
-	logger.SysInfo("token.secret.sync", "watching token secrets prefix=%s", cfg.TokenSecretSync.Prefix)
+	logger.SysInfo(
+		"token.secret.sync",
+		"watching redis token secret cache prefix=%s channel=%s",
+		syncer.cacheKeyPrefix,
+		syncer.invalidateChannel,
+	)
 
 	health := handler.NewHealthHandler(
 		db,
@@ -164,18 +148,57 @@ func (a *App) Start(cfg *config.Config) error {
 		return err
 	}
 
-	a.Server = &http.Server{
-		Handler: a.Router,
+	tlsCfg, tlsErr := buildServerTLSConfig(cfg.App)
+	if tlsErr != nil {
+		_ = ln.Close()
+		return tlsErr
 	}
+
+	a.Server = &http.Server{
+		Handler:   a.Router,
+		TLSConfig: tlsCfg,
+	}
+	ln = tls.NewListener(ln, tlsCfg)
 
 	a.hc.MarkReady()
 
-	logger.SysInfo("http", "starting server at %s", addr)
+	logger.SysInfo("http", "starting https server at %s", addr)
 
 	if err := a.Server.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 	return nil
+}
+
+func buildServerTLSConfig(cfg config.AppCfg) (*tls.Config, error) {
+	certFile := cfg.TLSCertPath
+	keyFile := cfg.TLSKeyPath
+	caFile := cfg.TLSCAPath
+	if certFile == "" || keyFile == "" || caFile == "" {
+		return nil, fmt.Errorf("tls paths are required")
+	}
+
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("load ums tls cert/key failed: %w", err)
+	}
+
+	caPEM, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("read ums tls ca failed: %w", err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caPEM) {
+		return nil, fmt.Errorf("invalid ums tls ca pem")
+	}
+
+	return &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		Certificates: []tls.Certificate{cert},
+		ClientCAs:    pool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		NextProtos:   []string{"h2", "http/1.1"},
+	}, nil
 }
 
 func (a *App) Stop() {
@@ -204,11 +227,6 @@ func (a *App) Stop() {
 		//  Close Redis
 		if a.Modules.Redis != nil {
 			_ = a.Modules.Redis.Close()
-		}
-		if a.Modules.Etcd != nil {
-			if err := a.Modules.Etcd.Close(); err != nil {
-				logger.SysError("shutdown.etcd", err, "etcd shutdown failed")
-			}
 		}
 	}
 

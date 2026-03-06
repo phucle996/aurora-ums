@@ -2,27 +2,34 @@ package config
 
 import (
 	"aurora/internal/cache"
-	"log"
 	"time"
+)
 
-	"github.com/joho/godotenv"
+const (
+	UMSTLSCertPath          = "/etc/aurora/certs/ums.crt"
+	UMSTLSKeyPath           = "/etc/aurora/certs/ums.key"
+	UMSTLSCAPath            = "/etc/aurora/certs/ca.crt"
+	DefaultAdminRPCEndpoint = "admin.aurora.local:3009"
 )
 
 type AppCfg struct {
-	Name     string
-	Host     string
-	Port     int
-	LogLV    string
-	TimeZone string
+	Name        string
+	Host        string
+	Port        int
+	LogLV       string
+	TimeZone    string
+	TLSCertPath string
+	TLSKeyPath  string
+	TLSCAPath   string
 }
 
 type PsqlCfg struct {
 	DbURL      string
 	Schema     string
 	SslMode    string
-	CA         string //  file path
-	ClientKey  string // file path
-	ClientCert string // file path
+	CA         string
+	ClientKey  string
+	ClientCert string
 }
 
 type RedisCfg struct {
@@ -31,39 +38,19 @@ type RedisCfg struct {
 	Password           string
 	DB                 int
 	UseTLS             bool
-	CA                 string // file path
-	ClientKey          string // file path
-	ClientCert         string // file path
+	CA                 string
+	ClientKey          string
+	ClientCert         string
 	InsecureSkipVerify bool
 }
 
-type EtcdCfg struct {
-	Endpoints []string
-
-	AutoSyncInterval     time.Duration
-	DialTimeout          time.Duration
-	DialKeepAliveTime    time.Duration
-	DialKeepAliveTimeout time.Duration
-
-	Username string
-	Password string
-
-	UseTLS             bool
-	CA                 string // file path
-	ClientKey          string // file path
-	ClientCert         string // file path
-	ServerName         string
+type AdminRPCCfg struct {
+	Endpoint           string
 	InsecureSkipVerify bool
-
-	PermitWithoutStream bool
-	RejectOldCluster    bool
-	MaxCallSendMsgSize  int
-	MaxCallRecvMsgSize  int
-
-	SASLEnable    bool
-	SASLMechanism string
-	SASLUsername  string
-	SASLPassword  string
+	DialTimeout        time.Duration
+	CAPath             string
+	ClientCert         string
+	ClientKey          string
 }
 
 type TokenCfg struct {
@@ -83,81 +70,52 @@ type CorsCfg struct {
 	MaxAge           time.Duration
 }
 
-type TokenSecretSyncCfg struct {
-	Enabled          bool
-	Prefix           string
-	BootstrapTimeout time.Duration
-}
-
 type Config struct {
-	App             AppCfg
-	Psql            PsqlCfg
-	Redis           RedisCfg
-	Etcd            EtcdCfg
-	Token           TokenCfg
-	TokenSecretSync TokenSecretSyncCfg
-	Cors            CorsCfg
+	App      AppCfg
+	Psql     PsqlCfg
+	Redis    RedisCfg
+	AdminRPC AdminRPCCfg
+	Token    TokenCfg
+	Cors     CorsCfg
 }
 
 func LoadConfig() *Config {
-	// load .env file (ignore if missing, can use env vars directly)
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, reading environment variables directly")
-	}
-
 	return &Config{
 		App: AppCfg{
-			Name:     "Aurora Cloud",
-			Host:     getEnv("APP_HOST", ""),
-			Port:     getEnvAsInt("APP_PORT", 3005),
-			LogLV:    getEnv("APP_LOG_LEVEL", ""),
-			TimeZone: getEnv("APP_TIMEZONE", "UTC"),
+			Name:        "Aurora User Managment System",
+			Host:        "",
+			Port:        3005,
+			LogLV:       "info",
+			TimeZone:    "UTC",
+			TLSCertPath: UMSTLSCertPath,
+			TLSKeyPath:  UMSTLSKeyPath,
+			TLSCAPath:   UMSTLSCAPath,
 		},
 		Psql: PsqlCfg{
-			DbURL:      getEnv("DATABASE_URL", "postgres://aurora:27012004@localhost:5432/aurora"),
-			Schema:     getEnv("DB_SCHEMA", "ums"),
-			SslMode:    getEnv("DB_SSLMODE", "disable"),
-			CA:         getEnv("DB_SSLROOTCERT", ""),
-			ClientKey:  getEnv("DB_SSLKEY", ""),
-			ClientCert: getEnv("DB_SSLCERT", ""),
+			DbURL:      "",
+			Schema:     "ums",
+			SslMode:    "disable",
+			CA:         "",
+			ClientKey:  "",
+			ClientCert: "",
 		},
 		Redis: RedisCfg{
-			Addr:               getEnv("REDIS_ADDR", "localhost:6379"),
-			Username:           getEnv("REDIS_USERNAME", ""),
-			Password:           getEnv("REDIS_PASSWORD", ""),
-			DB:                 getEnvAsInt("REDIS_DB", 0),
-			UseTLS:             getEnvAsBool("REDIS_TLS", false),
-			CA:                 getEnv("REDIS_TLS_CA", ""),
-			ClientKey:          getEnv("REDIS_TLS_KEY", ""),
-			ClientCert:         getEnv("REDIS_TLS_CERT", ""),
-			InsecureSkipVerify: getEnvAsBool("REDIS_TLS_INSECURE", false),
+			Addr:               "",
+			Username:           "",
+			Password:           "",
+			DB:                 0,
+			UseTLS:             false,
+			CA:                 "",
+			ClientKey:          "",
+			ClientCert:         "",
+			InsecureSkipVerify: false,
 		},
-		Etcd: EtcdCfg{
-			Endpoints:            getEnvAsSlice("ETCD_ENDPOINTS", []string{"localhost:2379"}),
-			AutoSyncInterval:     getEnvAsDuration("ETCD_AUTO_SYNC_INTERVAL", 5*time.Minute),
-			DialTimeout:          getEnvAsDuration("ETCD_DIAL_TIMEOUT", 5*time.Second),
-			DialKeepAliveTime:    getEnvAsDuration("ETCD_DIAL_KEEPALIVE_TIME", 30*time.Second),
-			DialKeepAliveTimeout: getEnvAsDuration("ETCD_DIAL_KEEPALIVE_TIMEOUT", 10*time.Second),
-
-			Username: getEnv("ETCD_USERNAME", ""),
-			Password: getEnv("ETCD_PASSWORD", ""),
-
-			UseTLS:             getEnvAsBool("ETCD_TLS", false),
-			CA:                 getEnv("ETCD_TLS_CA", ""),
-			ClientKey:          getEnv("ETCD_TLS_KEY", ""),
-			ClientCert:         getEnv("ETCD_TLS_CERT", ""),
-			ServerName:         getEnv("ETCD_TLS_SERVER_NAME", ""),
-			InsecureSkipVerify: getEnvAsBool("ETCD_TLS_INSECURE", false),
-
-			PermitWithoutStream: getEnvAsBool("ETCD_PERMIT_WITHOUT_STREAM", false),
-			RejectOldCluster:    getEnvAsBool("ETCD_REJECT_OLD_CLUSTER", false),
-			MaxCallSendMsgSize:  getEnvAsInt("ETCD_MAX_CALL_SEND_MSG_SIZE", 2*1024*1024),
-			MaxCallRecvMsgSize:  getEnvAsInt("ETCD_MAX_CALL_RECV_MSG_SIZE", 2*1024*1024),
-
-			SASLEnable:    getEnvAsBool("ETCD_SASL_ENABLE", false),
-			SASLMechanism: getEnv("ETCD_SASL_MECHANISM", "PLAIN"),
-			SASLUsername:  getEnv("ETCD_SASL_USERNAME", ""),
-			SASLPassword:  getEnv("ETCD_SASL_PASSWORD", ""),
+		AdminRPC: AdminRPCCfg{
+			Endpoint:    DefaultAdminRPCEndpoint,
+			DialTimeout: 5 * time.Second,
+			CAPath:      UMSTLSCAPath,
+			ClientCert:  UMSTLSCertPath,
+			ClientKey:   UMSTLSKeyPath,
 		},
 		Token: TokenCfg{
 			AccessTTL:  15 * time.Minute,
@@ -166,33 +124,18 @@ func LoadConfig() *Config {
 			DeviceTTL:  15 * time.Minute,
 			Secrets:    cache.NewTokenSecretCache(),
 		},
-		TokenSecretSync: TokenSecretSyncCfg{
-			Enabled:          getEnvAsBool("TOKEN_SECRET_SYNC_ENABLED", true),
-			Prefix:           getEnv("TOKEN_SECRET_SYNC_PREFIX", "/admin/token-secret"),
-			BootstrapTimeout: getEnvAsDuration("TOKEN_SECRET_SYNC_BOOTSTRAP_TIMEOUT", 5*time.Second),
-		},
 		Cors: CorsCfg{
-			AllowOrigins: getEnvAsSlice(
-				"CORS_ALLOW_ORIGINS",
-				[]string{
-					"http://localhost:5173",
-					"http://127.0.0.1:5173",
-					"http://localhost:8080",
-					"http://127.0.0.1:8080",
-				},
-			),
-
-			AllowMethods: getEnvAsSlice(
-				"CORS_ALLOW_METHODS",
-				[]string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-			),
-			AllowHeaders: getEnvAsSlice(
-				"CORS_ALLOW_HEADERS",
-				[]string{"Origin", "Content-Type", "Accept", "Authorization"},
-			),
-			ExposeHeaders:    getEnvAsSlice("CORS_EXPOSE_HEADERS", []string{}),
-			AllowCredentials: getEnvAsBool("CORS_ALLOW_CREDENTIALS", true),
-			MaxAge:           getEnvAsDuration("CORS_MAX_AGE", 12*time.Hour),
+			AllowOrigins: []string{
+				"http://localhost:5173",
+				"http://127.0.0.1:5173",
+				"http://localhost:8080",
+				"http://127.0.0.1:8080",
+			},
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+			ExposeHeaders:    []string{},
+			AllowCredentials: true,
+			MaxAge:           12 * time.Hour,
 		},
 	}
 }
@@ -255,7 +198,7 @@ func (c *TokenCfg) GetOttSecret() string {
 	return c.Secrets.GetOttSecret()
 }
 
-func (c *TokenCfg) ValidateEtcdBackedSecrets() error {
+func (c *TokenCfg) ValidateSecrets() error {
 	if c == nil || c.Secrets == nil {
 		return cache.ErrTokenSecretCacheNil
 	}
