@@ -26,11 +26,13 @@ UMS sẽ pull runtime config từ Admin qua RPC khi startup.
 
 ## 4) Bootstrap RPC
 
-Không cần env cho bootstrap endpoint.
+Phải set env endpoint thật của Admin (qua domain nginx), không có fallback default.
 
-UMS mặc định gọi Admin RPC tại:
+Ví dụ:
 
-`admin.aurora.local:3009`
+```bash
+export ADMIN_RPC_ENDPOINT=admin.aurora.local:443
+```
 
 ## 5) Health check
 

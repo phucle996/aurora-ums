@@ -8,12 +8,16 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
 
 func main() {
 	cfg := config.LoadConfig()
+	if strings.TrimSpace(cfg.AdminRPC.Endpoint) == "" {
+		log.Fatalf("ADMIN_RPC_ENDPOINT is required")
+	}
 
 	bootstrapCtx, cancelBootstrap := context.WithTimeout(context.Background(), cfg.AdminRPC.DialTimeout)
 	if cfg.AdminRPC.DialTimeout <= 0 {

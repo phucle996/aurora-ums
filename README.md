@@ -30,6 +30,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./bin/server ./cmd/server
 Kiểm tra binary:
 
 ```bash
+export ADMIN_RPC_ENDPOINT=admin.aurora.local:443
 ./bin/server
 ```
 

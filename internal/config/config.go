@@ -2,14 +2,15 @@ package config
 
 import (
 	"aurora/internal/cache"
+	"os"
+	"strings"
 	"time"
 )
 
 const (
-	UMSTLSCertPath          = "/etc/aurora/certs/ums.crt"
-	UMSTLSKeyPath           = "/etc/aurora/certs/ums.key"
-	UMSTLSCAPath            = "/etc/aurora/certs/ca.crt"
-	DefaultAdminRPCEndpoint = "admin.aurora.local:3009"
+	UMSTLSCertPath = "/etc/aurora/certs/ums.crt"
+	UMSTLSKeyPath  = "/etc/aurora/certs/ums.key"
+	UMSTLSCAPath   = "/etc/aurora/certs/ca.crt"
 )
 
 type AppCfg struct {
@@ -111,7 +112,7 @@ func LoadConfig() *Config {
 			InsecureSkipVerify: false,
 		},
 		AdminRPC: AdminRPCCfg{
-			Endpoint:    DefaultAdminRPCEndpoint,
+			Endpoint:    strings.TrimSpace(os.Getenv("ADMIN_RPC_ENDPOINT")),
 			DialTimeout: 5 * time.Second,
 			CAPath:      UMSTLSCAPath,
 			ClientCert:  UMSTLSCertPath,

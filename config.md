@@ -4,9 +4,9 @@ UMS không dùng etcd nữa. Runtime config được pull từ Admin service qua
 
 ## 1) Bootstrap config
 
-UMS dùng endpoint bootstrap cố định:
+UMS bắt buộc nhận endpoint bootstrap qua env, không có default:
 
-- `admin.aurora.local:3009`
+- `ADMIN_RPC_ENDPOINT` (ví dụ: `admin.aurora.local:443`)
 
 ## 2) TLS paths (fixed)
 
