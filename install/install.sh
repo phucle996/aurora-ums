@@ -8,7 +8,7 @@ INSTALL_DIR="/opt/aurora/ums"
 BIN_PATH="${INSTALL_DIR}/${APP_NAME}"
 SYSTEMD_PATH="/etc/systemd/system/${SERVICE_FILE_NAME}"
 
-REPO_SLUG="${REPO_SLUG:-phucle996/aurora-user-management-system}"
+REPO_SLUG="phucle996/aurora-ums"
 RELEASE_VERSION="${RELEASE_VERSION:-}"
 NO_START=0
 TLS_CERT_PATH="/etc/aurora/certs/ums.crt"
@@ -66,10 +66,10 @@ detect_arch() {
 resolve_latest_version() {
   local tmp
   tmp="$(mktemp)"
-  trap 'rm -f "$tmp"' RETURN
   fetch_url "https://api.github.com/repos/${REPO_SLUG}/releases/latest" "$tmp"
   local tag
   tag="$(grep -m1 '"tag_name"' "$tmp" | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')"
+  rm -f "$tmp"
   [ -n "$tag" ] || die "cannot resolve latest release tag from ${REPO_SLUG}"
   printf '%s' "$tag"
 }
@@ -101,7 +101,6 @@ install_binary() {
   log "downloading release ${version} (${arch})"
 
   tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "$tmp_dir"' RETURN
   tar_path="${tmp_dir}/${tar_name}"
   fetch_url "$download_url" "$tar_path"
 
@@ -109,15 +108,16 @@ install_binary() {
   tar -xzf "$tar_path" -C "$tmp_dir"
   install -m 0755 "${tmp_dir}/${APP_NAME}_linux_${arch}" "$BIN_PATH"
   chown -R aurora:aurora "$INSTALL_DIR"
+  rm -rf "$tmp_dir"
 }
 
 install_systemd_unit() {
   local tmp_unit unit_url
   tmp_unit="$(mktemp)"
-  trap 'rm -f "$tmp_unit"' RETURN
   unit_url="https://raw.githubusercontent.com/${REPO_SLUG}/main/install/${SERVICE_FILE_NAME}"
   fetch_url "$unit_url" "$tmp_unit"
   install -m 0644 "$tmp_unit" "$SYSTEMD_PATH"
+  rm -f "$tmp_unit"
 }
 
 restart_service() {
@@ -136,7 +136,7 @@ Usage:
 
 Options:
   -v <version>             Release tag (default: latest)
-  -r <repo>                GitHub repo slug (default: phucle996/aurora-user-management-system)
+  -r <repo>                GitHub repo slug (default: phucle996/aurora-ums)
   --no-start               Do not restart service after install
   -h, --help               Show help
 EOF

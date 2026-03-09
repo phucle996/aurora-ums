@@ -76,33 +76,34 @@ func buildTLSConfig(cfg *config.AdminRPCCfg) (*tls.Config, error) {
 	}
 
 	tlsCfg := &tls.Config{
-		MinVersion:         tls.VersionTLS12,
-		ServerName:         serverName,
-		InsecureSkipVerify: cfg.InsecureSkipVerify, //nolint:gosec
+		MinVersion: tls.VersionTLS12,
+		ServerName: serverName,
 	}
 
 	caPath := strings.TrimSpace(cfg.CAPath)
-	if caPath != "" {
-		caPEM, err := os.ReadFile(caPath)
-		if err != nil {
-			return nil, fmt.Errorf("read admin rpc ca failed: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if ok := pool.AppendCertsFromPEM(caPEM); !ok {
-			return nil, fmt.Errorf("invalid admin rpc ca")
-		}
-		tlsCfg.RootCAs = pool
+	if caPath == "" {
+		return nil, fmt.Errorf("admin rpc ca path is required for mTLS")
 	}
+	caPEM, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("read admin rpc ca failed: %w", err)
+	}
+	pool := x509.NewCertPool()
+	if ok := pool.AppendCertsFromPEM(caPEM); !ok {
+		return nil, fmt.Errorf("invalid admin rpc ca")
+	}
+	tlsCfg.RootCAs = pool
 
 	certPath := strings.TrimSpace(cfg.ClientCert)
 	keyPath := strings.TrimSpace(cfg.ClientKey)
-	if certPath != "" && keyPath != "" {
-		pair, err := tls.LoadX509KeyPair(certPath, keyPath)
-		if err != nil {
-			return nil, fmt.Errorf("load admin rpc client cert/key failed: %w", err)
-		}
-		tlsCfg.Certificates = []tls.Certificate{pair}
+	if certPath == "" || keyPath == "" {
+		return nil, fmt.Errorf("admin rpc client cert/key is required for mTLS")
 	}
+	pair, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("load admin rpc client cert/key failed: %w", err)
+	}
+	tlsCfg.Certificates = []tls.Certificate{pair}
 	return tlsCfg, nil
 }
 

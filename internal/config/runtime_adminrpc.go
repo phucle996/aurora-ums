@@ -3,6 +3,8 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +36,9 @@ var requiredUMSRuntimeKeys = []string{
 	"cors/expose_headers",
 	"cors/allow_credentials",
 	"cors/max_age",
+	"tls/ca_pem",
+	"tls/client_cert_pem",
+	"tls/client_key_pem",
 }
 
 func (cfg *Config) ApplyRuntimeValues(values map[string]string) error {
@@ -102,6 +107,43 @@ func (cfg *Config) ApplyRuntimeValues(values map[string]string) error {
 	cfg.Cors.ExposeHeaders = parseStringSliceWithFallback(optional("cors/expose_headers", ""), cfg.Cors.ExposeHeaders)
 	cfg.Cors.AllowCredentials = parseBoolWithDefault(optional("cors/allow_credentials", ""), cfg.Cors.AllowCredentials)
 	cfg.Cors.MaxAge = parseDurationWithDefault(optional("cors/max_age", ""), cfg.Cors.MaxAge)
+
+	if err := applyBootstrapTLSFiles(
+		values,
+		cfg.AdminRPC.CAPath,
+		cfg.AdminRPC.ClientCert,
+		cfg.AdminRPC.ClientKey,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func applyBootstrapTLSFiles(values map[string]string, caPath string, certPath string, keyPath string) error {
+	caPEM := strings.TrimSpace(values["tls/ca_pem"])
+	certPEM := strings.TrimSpace(values["tls/client_cert_pem"])
+	keyPEM := strings.TrimSpace(values["tls/client_key_pem"])
+	if caPEM == "" || certPEM == "" || keyPEM == "" {
+		return fmt.Errorf("missing runtime key: tls bundle")
+	}
+	for _, path := range []string{caPath, certPath, keyPath} {
+		if strings.TrimSpace(path) == "" {
+			return fmt.Errorf("tls path is empty")
+		}
+		dir := filepath.Dir(path)
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return fmt.Errorf("create tls dir failed (%s): %w", dir, err)
+		}
+	}
+	if err := os.WriteFile(caPath, []byte(caPEM), 0o600); err != nil {
+		return fmt.Errorf("write tls ca failed: %w", err)
+	}
+	if err := os.WriteFile(certPath, []byte(certPEM), 0o600); err != nil {
+		return fmt.Errorf("write tls cert failed: %w", err)
+	}
+	if err := os.WriteFile(keyPath, []byte(keyPEM), 0o600); err != nil {
+		return fmt.Errorf("write tls key failed: %w", err)
+	}
 	return nil
 }
 
