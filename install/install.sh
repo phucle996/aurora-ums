@@ -174,8 +174,13 @@ install_nginx_proxy() {
   rm -f "$tmp_conf"
 
   nginx -t
-  systemctl enable nginx
-  systemctl restart nginx
+  systemctl enable nginx >/dev/null 2>&1 || true
+  if systemctl is-active --quiet nginx; then
+    # Use reload first to avoid cutting long-lived upstream streams (e.g. admin install SSE).
+    systemctl reload nginx || systemctl restart nginx
+  else
+    systemctl start nginx
+  fi
 }
 
 restart_service() {
