@@ -7,10 +7,11 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 
-	"google.golang.org/grpc"
+	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -28,16 +29,16 @@ func FetchUMSRuntimeValues(ctx context.Context, cfg *config.AdminRPCCfg) (map[st
 	if endpoint == "" {
 		return nil, fmt.Errorf("admin rpc endpoint is empty")
 	}
-
-	tlsCfg, err := buildTLSConfig(cfg)
+	target, serverName, err := normalizeAdminRPCTarget(endpoint)
 	if err != nil {
 		return nil, err
 	}
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)),
-	}
 
-	conn, err := grpc.DialContext(ctx, endpoint, opts...)
+	tlsCfg, err := buildTLSConfig(cfg, serverName)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := gogrpc.NewClient(target, gogrpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
 	if err != nil {
 		return nil, fmt.Errorf("dial admin rpc failed: %w", err)
 	}
@@ -69,12 +70,7 @@ func FetchUMSRuntimeValues(ctx context.Context, cfg *config.AdminRPCCfg) (map[st
 	return values, nil
 }
 
-func buildTLSConfig(cfg *config.AdminRPCCfg) (*tls.Config, error) {
-	serverName, err := serverNameFromEndpoint(cfg.Endpoint)
-	if err != nil {
-		return nil, err
-	}
-
+func buildTLSConfig(cfg *config.AdminRPCCfg, serverName string) (*tls.Config, error) {
 	tlsCfg := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		ServerName: serverName,
@@ -107,19 +103,42 @@ func buildTLSConfig(cfg *config.AdminRPCCfg) (*tls.Config, error) {
 	return tlsCfg, nil
 }
 
-func serverNameFromEndpoint(endpoint string) (string, error) {
+func normalizeAdminRPCTarget(endpoint string) (target string, serverName string, err error) {
 	raw := strings.TrimSpace(endpoint)
 	if raw == "" {
-		return "", fmt.Errorf("admin rpc endpoint is empty")
+		return "", "", fmt.Errorf("admin rpc endpoint is empty")
 	}
-
-	host := raw
-	if parsedHost, _, splitErr := net.SplitHostPort(raw); splitErr == nil {
-		host = parsedHost
+	if strings.Contains(raw, "://") {
+		parsed, parseErr := url.Parse(raw)
+		if parseErr != nil {
+			return "", "", fmt.Errorf("invalid admin rpc endpoint %q", endpoint)
+		}
+		switch strings.ToLower(strings.TrimSpace(parsed.Scheme)) {
+		case "https", "grpcs", "tls":
+		default:
+			return "", "", fmt.Errorf("admin rpc endpoint must use tls")
+		}
+		host := strings.TrimSpace(parsed.Hostname())
+		if host == "" {
+			return "", "", fmt.Errorf("cannot resolve server name from admin rpc endpoint %q", endpoint)
+		}
+		port := strings.TrimSpace(parsed.Port())
+		if port == "" {
+			port = "443"
+		}
+		return net.JoinHostPort(host, port), host, nil
+	}
+	host, port, splitErr := net.SplitHostPort(raw)
+	if splitErr != nil {
+		host = strings.Trim(raw, "[]")
+		port = "443"
 	}
 	host = strings.Trim(strings.TrimSpace(host), "[]")
 	if host == "" {
-		return "", fmt.Errorf("cannot resolve server name from admin rpc endpoint %q", endpoint)
+		return "", "", fmt.Errorf("cannot resolve server name from admin rpc endpoint %q", endpoint)
 	}
-	return host, nil
+	if strings.TrimSpace(port) == "" {
+		port = "443"
+	}
+	return net.JoinHostPort(host, port), host, nil
 }

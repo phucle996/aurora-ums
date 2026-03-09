@@ -10,6 +10,8 @@ SYSTEMD_PATH="/etc/systemd/system/${SERVICE_FILE_NAME}"
 
 TLS_CERT_PATH="/etc/aurora/certs/ums.crt"
 TLS_KEY_PATH="/etc/aurora/certs/ums.key"
+NGINX_CONF_PATH="/etc/nginx/conf.d/aurora-ums.conf"
+UMS_ENV_FILE="/etc/aurora/ums.env"
 PURGE_CERTS=0
 
 log() {
@@ -94,6 +96,26 @@ remove_binaries() {
   fi
 }
 
+remove_runtime_env() {
+  if [ -f "$UMS_ENV_FILE" ]; then
+    log "removing runtime env ${UMS_ENV_FILE}"
+    rm -f "$UMS_ENV_FILE"
+  fi
+}
+
+remove_nginx_proxy() {
+  if [ -f "$NGINX_CONF_PATH" ]; then
+    log "removing nginx config ${NGINX_CONF_PATH}"
+    rm -f "$NGINX_CONF_PATH"
+    if command -v nginx >/dev/null 2>&1; then
+      nginx -t || true
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl restart nginx || true
+    fi
+  fi
+}
+
 remove_tls_if_requested() {
   if [ "$PURGE_CERTS" -ne 1 ]; then
     return
@@ -108,6 +130,8 @@ main() {
   stop_and_disable_service
   remove_systemd_unit
   remove_binaries
+  remove_runtime_env
+  remove_nginx_proxy
   remove_tls_if_requested
   log "uninstall completed: ${SERVICE_NAME}"
 }

@@ -11,9 +11,14 @@ SYSTEMD_PATH="/etc/systemd/system/${SERVICE_FILE_NAME}"
 REPO_SLUG="phucle996/aurora-ums"
 RELEASE_VERSION="${RELEASE_VERSION:-}"
 NO_START=0
+APP_HOSTNAME="${APP_HOSTNAME:-ums.aurora.local}"
+BACKEND_PORT="${AURORA_UMS_BACKEND_PORT:-3005}"
+ADMIN_RPC_ENDPOINT="${ADMIN_RPC_ENDPOINT:-}"
 TLS_CERT_PATH="/etc/aurora/certs/ums.crt"
 TLS_KEY_PATH="/etc/aurora/certs/ums.key"
 TLS_CA_PATH="/etc/aurora/certs/ca.crt"
+NGINX_CONF_PATH="/etc/nginx/conf.d/aurora-ums.conf"
+UMS_ENV_FILE="/etc/aurora/ums.env"
 
 log() {
   printf '[ums-install] %s\n' "$*"
@@ -120,6 +125,59 @@ install_systemd_unit() {
   rm -f "$tmp_unit"
 }
 
+write_runtime_env() {
+  [ -n "$ADMIN_RPC_ENDPOINT" ] || die "admin rpc endpoint is required (--admin-rpc-endpoint)"
+  mkdir -p "$(dirname "$UMS_ENV_FILE")"
+  cat >"$UMS_ENV_FILE" <<EOF
+ADMIN_RPC_ENDPOINT=${ADMIN_RPC_ENDPOINT}
+EOF
+  chmod 0600 "$UMS_ENV_FILE"
+}
+
+ensure_nginx() {
+  if command -v nginx >/dev/null 2>&1; then
+    return
+  fi
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get install -y nginx
+    return
+  fi
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y nginx
+    return
+  fi
+  if command -v yum >/dev/null 2>&1; then
+    yum install -y nginx
+    return
+  fi
+  if command -v apk >/dev/null 2>&1; then
+    apk add --no-cache nginx
+    return
+  fi
+  die "nginx is required but cannot be installed automatically"
+}
+
+install_nginx_proxy() {
+  ensure_nginx
+  local tmp_conf template_url
+  tmp_conf="$(mktemp)"
+  template_url="https://raw.githubusercontent.com/${REPO_SLUG}/main/install/nginx.conf"
+  fetch_url "$template_url" "$tmp_conf"
+  sed -i \
+    -e "s|__SERVER_NAME__|${APP_HOSTNAME}|g" \
+    -e "s|__TLS_CERT_FILE__|${TLS_CERT_PATH}|g" \
+    -e "s|__TLS_KEY_FILE__|${TLS_KEY_PATH}|g" \
+    -e "s|__TLS_CA_FILE__|${TLS_CA_PATH}|g" \
+    -e "s|__BACKEND_PORT__|${BACKEND_PORT}|g" \
+    "$tmp_conf"
+  install -m 0644 "$tmp_conf" "$NGINX_CONF_PATH"
+  rm -f "$tmp_conf"
+
+  nginx -t
+  systemctl enable nginx
+  systemctl restart nginx
+}
+
 restart_service() {
   systemctl daemon-reload
   systemctl enable "$SERVICE_NAME"
@@ -137,6 +195,8 @@ Usage:
 Options:
   -v <version>             Release tag (default: latest)
   -r <repo>                GitHub repo slug (default: phucle996/aurora-ums)
+  --app-host <hostname>    Public hostname used by nginx (default: ums.aurora.local)
+  --admin-rpc-endpoint <host:port>  Admin gRPC endpoint for bootstrap (required)
   --no-start               Do not restart service after install
   -h, --help               Show help
 EOF
@@ -153,6 +213,16 @@ parse_args() {
       -r)
         [ "$#" -ge 2 ] || die "missing value for -r"
         REPO_SLUG="$2"
+        shift 2
+        ;;
+      --app-host)
+        [ "$#" -ge 2 ] || die "missing value for --app-host"
+        APP_HOSTNAME="$2"
+        shift 2
+        ;;
+      --admin-rpc-endpoint)
+        [ "$#" -ge 2 ] || die "missing value for --admin-rpc-endpoint"
+        ADMIN_RPC_ENDPOINT="$2"
         shift 2
         ;;
       --no-start)
@@ -178,7 +248,9 @@ main() {
   ensure_user
   install_binary
   install_systemd_unit
+  write_runtime_env
   ensure_tls_materials
+  install_nginx_proxy
   restart_service
   log "install completed: ${SERVICE_NAME}"
 }

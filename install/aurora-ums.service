@@ -8,6 +8,7 @@ Type=simple
 User=aurora
 Group=aurora
 WorkingDirectory=/opt/aurora/ums
+EnvironmentFile=-/etc/aurora/ums.env
 ExecStart=/opt/aurora/ums/aurora-ums-service
 Restart=always
 RestartSec=3
