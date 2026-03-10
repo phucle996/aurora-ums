@@ -157,6 +157,70 @@ ensure_nginx() {
   die "nginx is required but cannot be installed automatically"
 }
 
+migrate_nginx_http2_deprecated_file() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+  local tmp_conf
+  tmp_conf="$(mktemp)"
+  awk '
+    BEGIN {
+      in_server = 0
+      depth = 0
+      has_http2 = 0
+      needs_http2 = 0
+    }
+    {
+      line = $0
+      if (!in_server && line ~ /^[[:space:]]*server[[:space:]]*\{[[:space:]]*$/) {
+        in_server = 1
+        depth = 0
+        has_http2 = 0
+        needs_http2 = 0
+      }
+      if (in_server && line ~ /^[[:space:]]*http2[[:space:]]+on;[[:space:]]*$/) {
+        has_http2 = 1
+      }
+      if (in_server && line ~ /^[[:space:]]*listen[[:space:]]+443[[:space:]]+ssl[[:space:]]+http2;[[:space:]]*$/) {
+        sub(/[[:space:]]+http2;/, ";", line)
+        needs_http2 = 1
+      }
+      if (in_server && line ~ /^[[:space:]]*listen[[:space:]]+\[::\]:443[[:space:]]+ssl[[:space:]]+http2;[[:space:]]*$/) {
+        sub(/[[:space:]]+http2;/, ";", line)
+        needs_http2 = 1
+      }
+      if (in_server && depth == 1 && line ~ /^[[:space:]]*}[[:space:]]*$/) {
+        if (needs_http2 && !has_http2) {
+          print "  http2 on;"
+          has_http2 = 1
+        }
+      }
+      print line
+      if (in_server) {
+        open_count = gsub(/\{/, "{", line)
+        close_count = gsub(/\}/, "}", line)
+        depth += open_count
+        depth -= close_count
+        if (depth <= 0) {
+          in_server = 0
+          depth = 0
+          has_http2 = 0
+          needs_http2 = 0
+        }
+      }
+    }
+  ' "$file" > "$tmp_conf"
+  install -m 0644 "$tmp_conf" "$file"
+  rm -f "$tmp_conf"
+}
+
+migrate_nginx_http2_deprecated_all() {
+  local conf
+  for conf in /etc/nginx/conf.d/aurora-*.conf; do
+    [ -e "$conf" ] || continue
+    migrate_nginx_http2_deprecated_file "$conf"
+  done
+}
+
 install_nginx_proxy() {
   ensure_nginx
   local tmp_conf template_url
@@ -173,6 +237,7 @@ install_nginx_proxy() {
   install -m 0644 "$tmp_conf" "$NGINX_CONF_PATH"
   rm -f "$tmp_conf"
 
+  migrate_nginx_http2_deprecated_all
   nginx -t
   systemctl enable nginx >/dev/null 2>&1 || true
   if systemctl is-active --quiet nginx; then
