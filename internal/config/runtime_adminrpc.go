@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,7 +12,6 @@ type UMSRuntimeBootstrap struct {
 	PSQL  UMSRuntimeBootstrapPSQL  `json:"psql"`
 	Redis UMSRuntimeBootstrapRedis `json:"redis"`
 	Token UMSRuntimeBootstrapToken `json:"token"`
-	TLS   UMSRuntimeBootstrapTLS   `json:"tls"`
 }
 
 type UMSRuntimeBootstrapApp struct {
@@ -46,12 +43,6 @@ type UMSRuntimeBootstrapToken struct {
 	RefreshTTL string `json:"refresh_ttl"`
 	DeviceTTL  string `json:"device_ttl"`
 	OttTTL     string `json:"ott_ttl"`
-}
-
-type UMSRuntimeBootstrapTLS struct {
-	CAPEM         string `json:"ca_pem"`
-	ClientCertPEM string `json:"client_cert_pem"`
-	ClientKeyPEM  string `json:"client_key_pem"`
 }
 
 func (cfg *Config) ApplyRuntimeBootstrap(bootstrap UMSRuntimeBootstrap) error {
@@ -140,44 +131,6 @@ func (cfg *Config) ApplyRuntimeBootstrap(bootstrap UMSRuntimeBootstrap) error {
 		return fmt.Errorf("invalid runtime config: token.ott_ttl")
 	}
 
-	if err := writeBootstrapTLSFiles(
-		bootstrap.TLS,
-		cfg.AdminRPC.CAPath,
-		cfg.AdminRPC.ClientCert,
-		cfg.AdminRPC.ClientKey,
-	); err != nil {
-		return err
-	}
-	return nil
-}
-
-func writeBootstrapTLSFiles(bundle UMSRuntimeBootstrapTLS, caPath string, certPath string, keyPath string) error {
-	if strings.TrimSpace(bundle.CAPEM) == "" {
-		return fmt.Errorf("missing runtime config: tls.ca_pem")
-	}
-	if strings.TrimSpace(bundle.ClientCertPEM) == "" {
-		return fmt.Errorf("missing runtime config: tls.client_cert_pem")
-	}
-	if strings.TrimSpace(bundle.ClientKeyPEM) == "" {
-		return fmt.Errorf("missing runtime config: tls.client_key_pem")
-	}
-	for _, path := range []string{caPath, certPath, keyPath} {
-		if strings.TrimSpace(path) == "" {
-			return fmt.Errorf("tls path is empty")
-		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-			return fmt.Errorf("create tls dir failed (%s): %w", filepath.Dir(path), err)
-		}
-	}
-	if err := os.WriteFile(caPath, []byte(strings.TrimSpace(bundle.CAPEM)), 0o600); err != nil {
-		return fmt.Errorf("write tls ca failed: %w", err)
-	}
-	if err := os.WriteFile(certPath, []byte(strings.TrimSpace(bundle.ClientCertPEM)), 0o600); err != nil {
-		return fmt.Errorf("write tls cert failed: %w", err)
-	}
-	if err := os.WriteFile(keyPath, []byte(strings.TrimSpace(bundle.ClientKeyPEM)), 0o600); err != nil {
-		return fmt.Errorf("write tls key failed: %w", err)
-	}
 	return nil
 }
 

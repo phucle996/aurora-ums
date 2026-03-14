@@ -7,10 +7,6 @@ import (
 
 func TestApplyRuntimeBootstrap_UsesStructuredConfig(t *testing.T) {
 	cfg := LoadConfig()
-	tlsDir := t.TempDir()
-	cfg.AdminRPC.CAPath = tlsDir + "/ca.crt"
-	cfg.AdminRPC.ClientCert = tlsDir + "/client.crt"
-	cfg.AdminRPC.ClientKey = tlsDir + "/client.key"
 
 	origOrigins := append([]string{}, cfg.Cors.AllowOrigins...)
 	origMaxAge := cfg.Cors.MaxAge
@@ -37,11 +33,6 @@ func TestApplyRuntimeBootstrap_UsesStructuredConfig(t *testing.T) {
 			RefreshTTL: "168h",
 			DeviceTTL:  "15m",
 			OttTTL:     "15m",
-		},
-		TLS: UMSRuntimeBootstrapTLS{
-			CAPEM:         "ca",
-			ClientCertPEM: "cert",
-			ClientKeyPEM:  "key",
 		},
 	})
 	if err != nil {

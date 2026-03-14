@@ -8,9 +8,11 @@ import (
 )
 
 const (
-	UMSTLSCertPath = "/etc/aurora/certs/ums.crt"
-	UMSTLSKeyPath  = "/etc/aurora/certs/ums.key"
-	UMSTLSCAPath   = "/etc/aurora/certs/ca.crt"
+	UMSTLSCertPath            = "/etc/aurora/certs/ums.crt"
+	UMSTLSKeyPath             = "/etc/aurora/certs/ums.key"
+	UMSTLSCAPath              = "/etc/aurora/certs/ca.crt"
+	UMSAdminRPCClientCertPath = "/etc/aurora/certs/ums-adminrpc-client.crt"
+	UMSAdminRPCClientKeyPath  = "/etc/aurora/certs/ums-adminrpc-client.key"
 )
 
 type AppCfg struct {
@@ -52,6 +54,7 @@ type AdminRPCCfg struct {
 	CAPath             string
 	ClientCert         string
 	ClientKey          string
+	BootstrapToken     string
 }
 
 type TokenCfg struct {
@@ -112,11 +115,12 @@ func LoadConfig() *Config {
 			InsecureSkipVerify: false,
 		},
 		AdminRPC: AdminRPCCfg{
-			Endpoint:    strings.TrimSpace(os.Getenv("ADMIN_RPC_ENDPOINT")),
-			DialTimeout: 5 * time.Second,
-			CAPath:      UMSTLSCAPath,
-			ClientCert:  UMSTLSCertPath,
-			ClientKey:   UMSTLSKeyPath,
+			Endpoint:       strings.TrimSpace(os.Getenv("ADMIN_RPC_ENDPOINT")),
+			DialTimeout:    5 * time.Second,
+			CAPath:         UMSTLSCAPath,
+			ClientCert:     UMSAdminRPCClientCertPath,
+			ClientKey:      UMSAdminRPCClientKeyPath,
+			BootstrapToken: strings.TrimSpace(os.Getenv("ADMIN_RPC_BOOTSTRAP_TOKEN")),
 		},
 		Token: TokenCfg{
 			AccessTTL:  15 * time.Minute,

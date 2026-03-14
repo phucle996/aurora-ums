@@ -45,28 +45,10 @@ func FetchUMSRuntimeBootstrap(ctx context.Context, cfg *config.AdminRPCCfg) (*co
 	req, err := structpb.NewStruct(map[string]any{
 		"module_name": "ums",
 		"config_keys": []any{
-			"app.timezone",
-			"app.log_level",
-			"app.port",
-			"psql.url",
-			"psql.ssl_mode",
-			"psql.schema",
-			"redis.addr",
-			"redis.username",
-			"redis.password",
-			"redis.db",
-			"redis.use_tls",
-			"redis.ca",
-			"redis.client_key",
-			"redis.client_cert",
-			"redis.insecure_skip_verify",
-			"token.access_ttl",
-			"token.refresh_ttl",
-			"token.device_ttl",
-			"token.ott_ttl",
-			"tls.ca_pem",
-			"tls.client_cert_pem",
-			"tls.client_key_pem",
+			"app",
+			"psql",
+			"redis",
+			"token",
 		},
 	})
 	if err != nil {
@@ -86,7 +68,6 @@ func FetchUMSRuntimeBootstrap(ctx context.Context, cfg *config.AdminRPCCfg) (*co
 	psqlField := root["psql"]
 	redisField := root["redis"]
 	tokenField := root["token"]
-	tlsField := root["tls"]
 	if appField == nil || appField.GetStructValue() == nil {
 		return nil, fmt.Errorf("runtime rpc response missing config.app")
 	}
@@ -99,15 +80,10 @@ func FetchUMSRuntimeBootstrap(ctx context.Context, cfg *config.AdminRPCCfg) (*co
 	if tokenField == nil || tokenField.GetStructValue() == nil {
 		return nil, fmt.Errorf("runtime rpc response missing config.token")
 	}
-	if tlsField == nil || tlsField.GetStructValue() == nil {
-		return nil, fmt.Errorf("runtime rpc response missing config.tls")
-	}
-
 	app := appField.GetStructValue().GetFields()
 	psql := psqlField.GetStructValue().GetFields()
 	redis := redisField.GetStructValue().GetFields()
 	token := tokenField.GetStructValue().GetFields()
-	tlsBundle := tlsField.GetStructValue().GetFields()
 
 	runtimeCfg := &config.UMSRuntimeBootstrap{
 		App: config.UMSRuntimeBootstrapApp{
@@ -136,11 +112,6 @@ func FetchUMSRuntimeBootstrap(ctx context.Context, cfg *config.AdminRPCCfg) (*co
 			RefreshTTL: readStructString(token, "refresh_ttl"),
 			DeviceTTL:  readStructString(token, "device_ttl"),
 			OttTTL:     readStructString(token, "ott_ttl"),
-		},
-		TLS: config.UMSRuntimeBootstrapTLS{
-			CAPEM:         readStructString(tlsBundle, "ca_pem"),
-			ClientCertPEM: readStructString(tlsBundle, "client_cert_pem"),
-			ClientKeyPEM:  readStructString(tlsBundle, "client_key_pem"),
 		},
 	}
 	return runtimeCfg, nil
@@ -200,21 +171,20 @@ func normalizeAdminRPCTarget(endpoint string) (target string, serverName string,
 		}
 		port := strings.TrimSpace(parsed.Port())
 		if port == "" {
-			port = "443"
+			return "", "", fmt.Errorf("admin rpc endpoint must include an explicit gRPC port")
 		}
 		return net.JoinHostPort(host, port), host, nil
 	}
 	host, port, splitErr := net.SplitHostPort(raw)
 	if splitErr != nil {
-		host = strings.Trim(raw, "[]")
-		port = "443"
+		return "", "", fmt.Errorf("admin rpc endpoint must be host:port")
 	}
 	host = strings.Trim(strings.TrimSpace(host), "[]")
 	if host == "" {
 		return "", "", fmt.Errorf("cannot resolve server name from admin rpc endpoint %q", endpoint)
 	}
 	if strings.TrimSpace(port) == "" {
-		port = "443"
+		return "", "", fmt.Errorf("admin rpc endpoint must include an explicit gRPC port")
 	}
 	return net.JoinHostPort(host, port), host, nil
 }

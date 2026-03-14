@@ -14,6 +14,7 @@ NO_START=0
 APP_HOSTNAME="${APP_HOSTNAME:-ums.aurora.local}"
 BACKEND_PORT="${AURORA_UMS_BACKEND_PORT:-3005}"
 ADMIN_RPC_ENDPOINT="${ADMIN_RPC_ENDPOINT:-}"
+ADMIN_RPC_BOOTSTRAP_TOKEN="${ADMIN_RPC_BOOTSTRAP_TOKEN:-}"
 TLS_CERT_PATH="/etc/aurora/certs/ums.crt"
 TLS_KEY_PATH="/etc/aurora/certs/ums.key"
 TLS_CA_PATH="/etc/aurora/certs/ca.crt"
@@ -130,6 +131,7 @@ write_runtime_env() {
   mkdir -p "$(dirname "$UMS_ENV_FILE")"
   cat >"$UMS_ENV_FILE" <<EOF
 ADMIN_RPC_ENDPOINT=${ADMIN_RPC_ENDPOINT}
+ADMIN_RPC_BOOTSTRAP_TOKEN=${ADMIN_RPC_BOOTSTRAP_TOKEN}
 EOF
   chmod 0600 "$UMS_ENV_FILE"
 }
@@ -267,6 +269,7 @@ Options:
   -r <repo>                GitHub repo slug (default: phucle996/aurora-ums)
   --app-host <hostname>    Public hostname used by nginx (default: ums.aurora.local)
   --admin-rpc-endpoint <host:port>  Admin gRPC endpoint for bootstrap (required)
+  --bootstrap-token <token>         One-time bootstrap token for AdminRPC client enroll
   --no-start               Do not restart service after install
   -h, --help               Show help
 EOF
@@ -293,6 +296,11 @@ parse_args() {
       --admin-rpc-endpoint)
         [ "$#" -ge 2 ] || die "missing value for --admin-rpc-endpoint"
         ADMIN_RPC_ENDPOINT="$2"
+        shift 2
+        ;;
+      --bootstrap-token)
+        [ "$#" -ge 2 ] || die "missing value for --bootstrap-token"
+        ADMIN_RPC_BOOTSTRAP_TOKEN="$2"
         shift 2
         ;;
       --no-start)

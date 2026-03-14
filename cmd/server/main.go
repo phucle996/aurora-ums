@@ -23,6 +23,10 @@ func main() {
 	if cfg.AdminRPC.DialTimeout <= 0 {
 		bootstrapCtx, cancelBootstrap = context.WithTimeout(context.Background(), 5*time.Second)
 	}
+	if err := adminrpc.EnsureUMSAdminRPCClientCertificate(bootstrapCtx, &cfg.AdminRPC); err != nil {
+		cancelBootstrap()
+		log.Fatalf("failed to enroll admin rpc client certificate: %v", err)
+	}
 	runtimeBootstrap, err := adminrpc.FetchUMSRuntimeBootstrap(bootstrapCtx, &cfg.AdminRPC)
 	if err != nil {
 		cancelBootstrap()
