@@ -1,0 +1,44 @@
+{
+  "schema_version": "aurora.installer.bundle.v1",
+  "module": "ums",
+  "version": "__VERSION__",
+  "runtime": "linux-systemd",
+  "capabilities": {
+    "install": true,
+    "restart": true,
+    "uninstall": true,
+    "migration": false,
+    "admin_rpc_bootstrap": true,
+    "nginx_integration": true
+  },
+  "binary": {
+    "path": "bin/aurora-ums-service",
+    "install_path": "/opt/aurora/ums/aurora-ums-service",
+    "mode": "0755"
+  },
+  "service": {
+    "name": "aurora-ums.service",
+    "template_path": "systemd/aurora-ums.service.tpl",
+    "unit_path": "/etc/systemd/system/aurora-ums.service"
+  },
+  "nginx": {
+    "enabled": true,
+    "template_path": "nginx/aurora-ums.conf.tpl",
+    "site_path": "/etc/nginx/conf.d/aurora-ums.conf"
+  },
+  "env": {
+    "path": "/etc/aurora/ums.env"
+  },
+  "runtime_bootstrap": {
+    "module_name": "ums"
+  },
+  "healthcheck": {
+    "scheme": "https",
+    "paths": [
+      "/health/liveness",
+      "/health/readiness",
+      "/health"
+    ],
+    "timeout_seconds": 8
+  }
+}

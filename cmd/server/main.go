@@ -23,12 +23,12 @@ func main() {
 	if cfg.AdminRPC.DialTimeout <= 0 {
 		bootstrapCtx, cancelBootstrap = context.WithTimeout(context.Background(), 5*time.Second)
 	}
-	runtimeValues, err := adminrpc.FetchUMSRuntimeValues(bootstrapCtx, &cfg.AdminRPC)
+	runtimeBootstrap, err := adminrpc.FetchUMSRuntimeBootstrap(bootstrapCtx, &cfg.AdminRPC)
 	if err != nil {
 		cancelBootstrap()
 		log.Fatalf("failed to pull runtime config from admin rpc: %v", err)
 	}
-	if err := cfg.ApplyRuntimeValues(runtimeValues); err != nil {
+	if err := cfg.ApplyRuntimeBootstrap(*runtimeBootstrap); err != nil {
 		cancelBootstrap()
 		log.Fatalf("failed to apply runtime config from admin rpc: %v", err)
 	}

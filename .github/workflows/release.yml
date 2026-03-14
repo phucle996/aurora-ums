@@ -8,7 +8,6 @@ on:
     paths-ignore:
       - ".github/workflows/release.yml"
       - "*.md"
-      - "install/*"
   workflow_dispatch:
 
 permissions:
@@ -60,8 +59,6 @@ jobs:
           tar -C dist -czf "dist/${APP_NAME}_linux_amd64.tar.gz" "${APP_NAME}_linux_amd64"
           tar -C dist -czf "dist/${APP_NAME}_linux_arm64.tar.gz" "${APP_NAME}_linux_arm64"
 
-          shasum -a 256 dist/*.tar.gz > dist/checksums.txt
-
       - name: Resolve release version
         id: version
         run: |
@@ -77,6 +74,29 @@ jobs:
             version="v${ts}-${rand}-alpha"
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build installer bundles
+        env:
+          APP_NAME: aurora-ums-service
+          MODULE_NAME: aurora-ums
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -Eeuo pipefail
+
+          for arch in amd64 arm64; do
+            bundle_root="dist/bundle_${arch}"
+            rm -rf "${bundle_root}"
+            mkdir -p "${bundle_root}/bin" "${bundle_root}/systemd" "${bundle_root}/nginx"
+
+            install -m 0755 "dist/${APP_NAME}_linux_${arch}" "${bundle_root}/bin/${APP_NAME}"
+            install -m 0644 install/aurora-ums.service.tpl "${bundle_root}/systemd/aurora-ums.service.tpl"
+            install -m 0644 install/nginx.conf.tpl "${bundle_root}/nginx/aurora-ums.conf.tpl"
+            sed "s|__VERSION__|${VERSION}|g" install/manifest.json > "${bundle_root}/manifest.json"
+
+            tar -C "${bundle_root}" -czf "dist/${MODULE_NAME}_linux_${arch}_bundle.tar.gz" .
+          done
+
+          shasum -a 256 dist/*.tar.gz > dist/checksums.txt
 
       - name: Delete existing release/tag (overwrite mode)
         env:
