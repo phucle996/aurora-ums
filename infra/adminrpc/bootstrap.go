@@ -85,13 +85,9 @@ func EnsureUMSAdminRPCClientCertificate(ctx context.Context, cfg *config.AdminRP
 }
 
 func buildBootstrapTLSConfig(cfg *config.AdminRPCCfg, serverName string) (*tls.Config, error) {
-	caPath := strings.TrimSpace(cfg.CAPath)
-	if caPath == "" {
-		return nil, fmt.Errorf("admin rpc ca path is required for bootstrap tls")
-	}
-	caPEM, err := os.ReadFile(caPath)
+	caPEM, err := readBootstrapCAPEM(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("read admin rpc ca failed: %w", err)
+		return nil, err
 	}
 	pool := x509.NewCertPool()
 	if ok := pool.AppendCertsFromPEM(caPEM); !ok {
@@ -102,6 +98,29 @@ func buildBootstrapTLSConfig(cfg *config.AdminRPCCfg, serverName string) (*tls.C
 		RootCAs:    pool,
 		ServerName: serverName,
 	}, nil
+}
+
+func readBootstrapCAPEM(cfg *config.AdminRPCCfg) ([]byte, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("admin rpc config is nil")
+	}
+	candidates := []string{
+		strings.TrimSpace(cfg.CAPath),
+		config.UMSTLSCAPath,
+	}
+	for _, path := range candidates {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		pemBytes, err := os.ReadFile(path)
+		if err == nil {
+			return pemBytes, nil
+		}
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("read admin rpc ca failed: %w", err)
+		}
+	}
+	return nil, fmt.Errorf("read admin rpc ca failed: no bootstrap CA file found")
 }
 
 func certAndKeyExist(certPath string, keyPath string) bool {
