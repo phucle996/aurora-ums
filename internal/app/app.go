@@ -9,11 +9,9 @@ import (
 	"aurora/pkg/logger"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -173,9 +171,8 @@ func (a *App) Start(cfg *config.Config) error {
 func buildServerTLSConfig(cfg config.AppCfg) (*tls.Config, error) {
 	certFile := cfg.TLSCertPath
 	keyFile := cfg.TLSKeyPath
-	caFile := cfg.TLSCAPath
-	if certFile == "" || keyFile == "" || caFile == "" {
-		return nil, fmt.Errorf("tls paths are required")
+	if certFile == "" || keyFile == "" {
+		return nil, fmt.Errorf("tls cert/key paths are required")
 	}
 
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -183,20 +180,10 @@ func buildServerTLSConfig(cfg config.AppCfg) (*tls.Config, error) {
 		return nil, fmt.Errorf("load ums tls cert/key failed: %w", err)
 	}
 
-	caPEM, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, fmt.Errorf("read ums tls ca failed: %w", err)
-	}
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(caPEM) {
-		return nil, fmt.Errorf("invalid ums tls ca pem")
-	}
-
 	return &tls.Config{
 		MinVersion:   tls.VersionTLS12,
 		Certificates: []tls.Certificate{cert},
-		ClientCAs:    pool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientAuth:   tls.NoClientCert,
 		NextProtos:   []string{"h2", "http/1.1"},
 	}, nil
 }

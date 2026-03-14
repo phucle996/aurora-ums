@@ -11,8 +11,10 @@ const (
 	UMSTLSCertPath            = "/etc/aurora/certs/ums.crt"
 	UMSTLSKeyPath             = "/etc/aurora/certs/ums.key"
 	UMSTLSCAPath              = "/etc/aurora/certs/ca.crt"
-	UMSAdminRPCClientCertPath = "/etc/aurora/certs/ums-adminrpc-client.crt"
-	UMSAdminRPCClientKeyPath  = "/etc/aurora/certs/ums-adminrpc-client.key"
+	UMSAdminRPCCertDir        = "/var/lib/aurora-ums"
+	UMSAdminRPCCAPath         = "/var/lib/aurora-ums/adminrpc-ca.crt"
+	UMSAdminRPCClientCertPath = "/var/lib/aurora-ums/adminrpc-client.crt"
+	UMSAdminRPCClientKeyPath  = "/var/lib/aurora-ums/adminrpc-client.key"
 )
 
 type AppCfg struct {
@@ -117,7 +119,7 @@ func LoadConfig() *Config {
 		AdminRPC: AdminRPCCfg{
 			Endpoint:       strings.TrimSpace(os.Getenv("ADMIN_RPC_ENDPOINT")),
 			DialTimeout:    5 * time.Second,
-			CAPath:         UMSTLSCAPath,
+			CAPath:         UMSAdminRPCCAPath,
 			ClientCert:     UMSAdminRPCClientCertPath,
 			ClientKey:      UMSAdminRPCClientKeyPath,
 			BootstrapToken: strings.TrimSpace(os.Getenv("ADMIN_RPC_BOOTSTRAP_TOKEN")),

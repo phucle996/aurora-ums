@@ -8,6 +8,7 @@ Type=simple
 User=aurora
 Group=aurora
 WorkingDirectory=/opt/aurora/ums
+StateDirectory=aurora-ums
 EnvironmentFile=-{{ .EnvFilePath }}
 ExecStart={{ .BinaryPath }}
 Restart=always
