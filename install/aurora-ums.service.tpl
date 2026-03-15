@@ -9,6 +9,7 @@ User=aurora
 Group=aurora
 WorkingDirectory=/opt/aurora/ums
 StateDirectory=aurora-ums
+ReadWritePaths=/var/lib/aurora-ums
 EnvironmentFile=-{{ .EnvFilePath }}
 ExecStart={{ .BinaryPath }}
 Restart=always

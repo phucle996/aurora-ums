@@ -27,7 +27,7 @@
     "site_path": "/etc/nginx/conf.d/aurora-ums.conf"
   },
   "env": {
-    "path": "/etc/aurora/ums.env"
+    "path": "/var/lib/aurora-ums/config/ums.env"
   },
   "runtime_bootstrap": {
     "module_name": "ums"

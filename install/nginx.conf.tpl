@@ -11,13 +11,13 @@ server {
   http2 on;
   server_name {{ .AppHost }};
 
-  ssl_certificate /etc/aurora/certs/ums.crt;
-  ssl_certificate_key /etc/aurora/certs/ums.key;
+  ssl_certificate /var/lib/aurora-ums/tls/server.crt;
+  ssl_certificate_key /var/lib/aurora-ums/tls/server.key;
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_session_timeout 10m;
   ssl_prefer_server_ciphers off;
 
-  ssl_client_certificate /etc/aurora/certs/ca.crt;
+  ssl_client_certificate /var/lib/aurora-ums/tls/ca.crt;
   ssl_verify_client optional;
 
   location / {
@@ -37,8 +37,8 @@ server {
     proxy_ssl_server_name on;
     proxy_ssl_name {{ .AppHost }};
     proxy_ssl_verify on;
-    proxy_ssl_trusted_certificate /etc/aurora/certs/ca.crt;
-    proxy_ssl_certificate /etc/aurora/certs/ums.crt;
-    proxy_ssl_certificate_key /etc/aurora/certs/ums.key;
+    proxy_ssl_trusted_certificate /var/lib/aurora-ums/tls/ca.crt;
+    proxy_ssl_certificate /var/lib/aurora-ums/tls/server.crt;
+    proxy_ssl_certificate_key /var/lib/aurora-ums/tls/server.key;
   }
 }

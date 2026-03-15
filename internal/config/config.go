@@ -8,13 +8,17 @@ import (
 )
 
 const (
-	UMSTLSCertPath            = "/etc/aurora/certs/ums.crt"
-	UMSTLSKeyPath             = "/etc/aurora/certs/ums.key"
-	UMSTLSCAPath              = "/etc/aurora/certs/ca.crt"
-	UMSAdminRPCCertDir        = "/var/lib/aurora-ums"
-	UMSAdminRPCCAPath         = "/var/lib/aurora-ums/adminrpc-ca.crt"
-	UMSAdminRPCClientCertPath = "/var/lib/aurora-ums/adminrpc-client.crt"
-	UMSAdminRPCClientKeyPath  = "/var/lib/aurora-ums/adminrpc-client.key"
+	UMSStateDir               = "/var/lib/aurora-ums"
+	UMSConfigDir              = UMSStateDir + "/config"
+	UMSTLSDir                 = UMSStateDir + "/tls"
+	UMSAdminRPCCertDir        = UMSStateDir + "/adminrpc"
+	UMSTLSCertPath            = UMSTLSDir + "/server.crt"
+	UMSTLSKeyPath             = UMSTLSDir + "/server.key"
+	UMSTLSCAPath              = UMSTLSDir + "/ca.crt"
+	UMSAdminRPCCAPath         = UMSTLSCAPath
+	UMSAdminRPCClientCertPath = UMSAdminRPCCertDir + "/client.crt"
+	UMSAdminRPCClientKeyPath  = UMSAdminRPCCertDir + "/client.key"
+	UMSEnvPath                = UMSConfigDir + "/ums.env"
 )
 
 type AppCfg struct {

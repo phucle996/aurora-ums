@@ -104,23 +104,15 @@ func readBootstrapCAPEM(cfg *config.AdminRPCCfg) ([]byte, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("admin rpc config is nil")
 	}
-	candidates := []string{
-		strings.TrimSpace(cfg.CAPath),
-		config.UMSTLSCAPath,
+	caPath := strings.TrimSpace(cfg.CAPath)
+	if caPath == "" {
+		return nil, fmt.Errorf("admin rpc ca path is required")
 	}
-	for _, path := range candidates {
-		if strings.TrimSpace(path) == "" {
-			continue
-		}
-		pemBytes, err := os.ReadFile(path)
-		if err == nil {
-			return pemBytes, nil
-		}
-		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("read admin rpc ca failed: %w", err)
-		}
+	pemBytes, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("read admin rpc ca failed: %w", err)
 	}
-	return nil, fmt.Errorf("read admin rpc ca failed: no bootstrap CA file found")
+	return pemBytes, nil
 }
 
 func certAndKeyExist(certPath string, keyPath string) bool {
