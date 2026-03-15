@@ -1,7 +1,6 @@
 package adminrpc
 
 import (
-	runtimev1 "github.com/phucle996/aurora-proto/runtimev1"
 	"aurora/internal/config"
 	"context"
 	"crypto/rand"
@@ -11,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	runtimev1 "github.com/phucle996/aurora-proto/runtimev1"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -26,10 +26,10 @@ func EnsureUMSAdminRPCClientCertificate(ctx context.Context, cfg *config.AdminRP
 	if cfg == nil {
 		return fmt.Errorf("admin rpc config is nil")
 	}
-	if certAndKeyExist(cfg.ClientCert, cfg.ClientKey) {
-		return nil
-	}
 	if strings.TrimSpace(cfg.BootstrapToken) == "" {
+		if certAndKeyExist(cfg.ClientCert, cfg.ClientKey) {
+			return nil
+		}
 		return fmt.Errorf("missing admin rpc client cert/key and bootstrap token")
 	}
 
