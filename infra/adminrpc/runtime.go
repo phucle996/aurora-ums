@@ -1,6 +1,7 @@
 package adminrpc
 
 import (
+	runtimev1 "github.com/phucle996/aurora-proto/runtimev1"
 	"aurora/internal/config"
 	"context"
 	"crypto/tls"
@@ -9,14 +10,12 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/protobuf/types/known/structpb"
 )
-
-const runtimeGetRuntimeBootstrapPath = "/admin.transport.runtime.v1.RuntimeService/GetRuntimeBootstrap"
 
 func FetchUMSRuntimeBootstrap(ctx context.Context, cfg *config.AdminRPCCfg) (*config.UMSRuntimeBootstrap, error) {
 	if cfg == nil {
@@ -42,9 +41,9 @@ func FetchUMSRuntimeBootstrap(ctx context.Context, cfg *config.AdminRPCCfg) (*co
 	}
 	defer conn.Close()
 
-	req, err := structpb.NewStruct(map[string]any{
-		"module_name": "ums",
-		"config_keys": []any{
+	res, err := runtimev1.NewRuntimeServiceClient(conn).GetRuntimeBootstrap(ctx, &runtimev1.GetRuntimeBootstrapRequest{
+		ModuleName: "ums",
+		ConfigGroups: []string{
 			"app",
 			"psql",
 			"redis",
@@ -52,66 +51,56 @@ func FetchUMSRuntimeBootstrap(ctx context.Context, cfg *config.AdminRPCCfg) (*co
 		},
 	})
 	if err != nil {
-		return nil, err
-	}
-	res := &structpb.Struct{}
-	if err := conn.Invoke(ctx, runtimeGetRuntimeBootstrapPath, req, res); err != nil {
 		return nil, fmt.Errorf("invoke admin runtime rpc failed: %w", err)
 	}
-
-	configField, ok := res.GetFields()["config"]
-	if !ok || configField == nil || configField.GetStructValue() == nil {
+	root := res.GetConfig()
+	if root == nil {
 		return nil, fmt.Errorf("runtime rpc response missing config")
 	}
-	root := configField.GetStructValue().GetFields()
-	appField := root["app"]
-	psqlField := root["psql"]
-	redisField := root["redis"]
-	tokenField := root["token"]
-	if appField == nil || appField.GetStructValue() == nil {
+	app := root.GetApp()
+	psql := root.GetPsql()
+	redis := root.GetRedis()
+	token := root.GetToken()
+	if app == nil {
 		return nil, fmt.Errorf("runtime rpc response missing config.app")
 	}
-	if psqlField == nil || psqlField.GetStructValue() == nil {
+	if psql == nil {
 		return nil, fmt.Errorf("runtime rpc response missing config.psql")
 	}
-	if redisField == nil || redisField.GetStructValue() == nil {
+	if redis == nil {
 		return nil, fmt.Errorf("runtime rpc response missing config.redis")
 	}
-	if tokenField == nil || tokenField.GetStructValue() == nil {
+	if token == nil {
 		return nil, fmt.Errorf("runtime rpc response missing config.token")
 	}
-	app := appField.GetStructValue().GetFields()
-	psql := psqlField.GetStructValue().GetFields()
-	redis := redisField.GetStructValue().GetFields()
-	token := tokenField.GetStructValue().GetFields()
 
 	runtimeCfg := &config.UMSRuntimeBootstrap{
 		App: config.UMSRuntimeBootstrapApp{
-			TimeZone: readStructString(app, "timezone"),
-			LogLevel: readStructString(app, "log_level"),
-			Port:     readStructInt(app, "port"),
+			TimeZone: app.GetTimezone(),
+			LogLevel: app.GetLogLevel(),
+			Port:     int(app.GetPort()),
 		},
 		PSQL: config.UMSRuntimeBootstrapPSQL{
-			URL:     readStructString(psql, "url"),
-			SSLMode: readStructString(psql, "ssl_mode"),
-			Schema:  readStructString(psql, "schema"),
+			URL:     psql.GetUrl(),
+			SSLMode: psql.GetSslMode(),
+			Schema:  psql.GetSchema(),
 		},
 		Redis: config.UMSRuntimeBootstrapRedis{
-			Addr:               readStructString(redis, "addr"),
-			Username:           readStructString(redis, "username"),
-			Password:           readStructString(redis, "password"),
-			DB:                 readStructString(redis, "db"),
-			UseTLS:             readStructString(redis, "use_tls"),
-			CA:                 readStructString(redis, "ca"),
-			ClientKey:          readStructString(redis, "client_key"),
-			ClientCert:         readStructString(redis, "client_cert"),
-			InsecureSkipVerify: readStructString(redis, "insecure_skip_verify"),
+			Addr:               redis.GetAddr(),
+			Username:           redis.GetUsername(),
+			Password:           redis.GetPassword(),
+			DB:                 redis.GetDb(),
+			UseTLS:             strconv.FormatBool(redis.GetUseTls()),
+			CA:                 redis.GetCa(),
+			ClientKey:          redis.GetClientKey(),
+			ClientCert:         redis.GetClientCert(),
+			InsecureSkipVerify: strconv.FormatBool(redis.GetInsecureSkipVerify()),
 		},
 		Token: config.UMSRuntimeBootstrapToken{
-			AccessTTL:  readStructString(token, "access_ttl"),
-			RefreshTTL: readStructString(token, "refresh_ttl"),
-			DeviceTTL:  readStructString(token, "device_ttl"),
-			OttTTL:     readStructString(token, "ott_ttl"),
+			AccessTTL:  token.GetAccessTtl(),
+			RefreshTTL: token.GetRefreshTtl(),
+			DeviceTTL:  token.GetDeviceTtl(),
+			OttTTL:     token.GetOttTtl(),
 		},
 	}
 	return runtimeCfg, nil
@@ -187,26 +176,4 @@ func normalizeAdminRPCTarget(endpoint string) (target string, serverName string,
 		return "", "", fmt.Errorf("admin rpc endpoint must include an explicit gRPC port")
 	}
 	return net.JoinHostPort(host, port), host, nil
-}
-
-func readStructString(fields map[string]*structpb.Value, key string) string {
-	if fields == nil {
-		return ""
-	}
-	value := fields[key]
-	if value == nil {
-		return ""
-	}
-	return strings.TrimSpace(value.GetStringValue())
-}
-
-func readStructInt(fields map[string]*structpb.Value, key string) int {
-	if fields == nil {
-		return 0
-	}
-	value := fields[key]
-	if value == nil {
-		return 0
-	}
-	return int(value.GetNumberValue())
 }

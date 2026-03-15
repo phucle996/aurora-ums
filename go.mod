@@ -3,15 +3,12 @@ module aurora
 go 1.26.0
 
 require (
-	github.com/alicebob/miniredis/v2 v2.37.0
 	github.com/jackc/pgx/v5 v5.8.0
-	google.golang.org/grpc v1.71.1
+	github.com/phucle996/aurora-proto v0.0.0-20260315160913-32ddf149c58f
+	google.golang.org/grpc v1.78.0
 )
 
-require (
-	github.com/yuin/gopher-lua v1.1.1 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb // indirect
-)
+require google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
 
 require (
 	github.com/bytedance/sonic v1.14.0 // indirect
@@ -43,7 +40,7 @@ require (
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/tools v0.38.0 // indirect
-	google.golang.org/protobuf v1.36.9
+	google.golang.org/protobuf v1.36.10 // indirect
 )
 
 require (
@@ -56,7 +53,6 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sync v0.18.0 // indirect

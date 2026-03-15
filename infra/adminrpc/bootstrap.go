@@ -1,6 +1,7 @@
 package adminrpc
 
 import (
+	runtimev1 "github.com/phucle996/aurora-proto/runtimev1"
 	"aurora/internal/config"
 	"context"
 	"crypto/rand"
@@ -17,10 +18,8 @@ import (
 
 	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const runtimeBootstrapModuleClientPath = "/admin.transport.runtime.v1.RuntimeService/BootstrapModuleClient"
 const moduleBootstrapRuntimeRole = "module-runtime"
 
 func EnsureUMSAdminRPCClientCertificate(ctx context.Context, cfg *config.AdminRPCCfg) error {
@@ -53,21 +52,17 @@ func EnsureUMSAdminRPCClientCertificate(ctx context.Context, cfg *config.AdminRP
 	}
 	defer conn.Close()
 
-	req, err := structpb.NewStruct(map[string]any{
-		"module_name":     "ums",
-		"bootstrap_token": strings.TrimSpace(cfg.BootstrapToken),
-		"csr_pem":         strings.TrimSpace(string(csrPEM)),
+	resp, err := runtimev1.NewRuntimeServiceClient(conn).BootstrapModuleClient(ctx, &runtimev1.BootstrapModuleClientRequest{
+		ModuleName:     "ums",
+		BootstrapToken: strings.TrimSpace(cfg.BootstrapToken),
+		CsrPem:         strings.TrimSpace(string(csrPEM)),
 	})
 	if err != nil {
-		return fmt.Errorf("build bootstrap request failed: %w", err)
-	}
-	resp := &structpb.Struct{}
-	if err := conn.Invoke(ctx, runtimeBootstrapModuleClientPath, req, resp); err != nil {
 		return fmt.Errorf("bootstrap module client rpc failed: %w", err)
 	}
 
-	clientCertPEM := strings.TrimSpace(readStructString(resp.GetFields(), "client_cert_pem"))
-	adminServerCAPEM := strings.TrimSpace(readStructString(resp.GetFields(), "admin_server_ca_pem"))
+	clientCertPEM := strings.TrimSpace(resp.GetClientCertPem())
+	adminServerCAPEM := strings.TrimSpace(resp.GetAdminServerCaPem())
 	if clientCertPEM == "" || adminServerCAPEM == "" {
 		return fmt.Errorf("bootstrap rpc response missing certificates")
 	}
